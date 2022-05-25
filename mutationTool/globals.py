@@ -58,7 +58,22 @@ instances = {
     253: 'moving-bicyclist',
     254: 'moving-person',
     255: 'moving-motorcyclist',
-    256: 'moving-on-rails',
+    257: 'moving-bus',
+    258: 'moving-truck',
+    259: 'moving-other-vehicle'
+}
+
+instancesVehicle = {
+    10: 'car',
+    11: 'bicycle',
+    13: 'bus',
+    15: 'motorcycle',
+    18: 'truck',
+    20: 'other-vehicle',
+    32: 'motorcyclist',
+    252: 'moving-car',
+    253: 'moving-bicyclist',
+    255: 'moving-motorcyclist',
     257: 'moving-bus',
     258: 'moving-truck',
     259: 'moving-other-vehicle'
@@ -88,9 +103,9 @@ centerArea = np.array([
 # Enum of the different types of mutations supported
 class Mutation(Enum):
     ADD = "ADD" # New Asset
-    COPY = "COPY" # make a copy of the asset
+    SCENE = "SCENE" # make a copy of the asset
     # MOVE = "MOVE" # remove the asset and place somewhere else
-    REMOVE = "REMOVE"
+    
 
 # Transformations for add / copy
 class Transformations(Enum):
@@ -100,7 +115,8 @@ class Transformations(Enum):
     # MIRROR = "MIRROR"
 
     ROTATE_MIRROR = "ROTATE_MIRROR"
-    # INTENSITY = "INTENSITY"
+    INTENSITY = "INTENSITY"
+    REMOVE = "REMOVE"
 
 
 
@@ -116,6 +132,8 @@ rotation = None
 mirrorAxis = None
 intensityChange = None
 
+
+vehicles = set()
 
 
 # ---------------------------------------------------------------
@@ -218,6 +236,8 @@ def init(args):
     global mirrorAxis
     global intensityChange
 
+    global vehicles
+
     binFiles = []
     labelFiles = []
     mutationsEnabled = []
@@ -238,6 +258,9 @@ def init(args):
     if (args.mirror):
         mirrorAxis = int(args.mirror)
 
+
+    for vehicle in instancesVehicle.keys():
+        vehicles.add(vehicle)
 
 
 

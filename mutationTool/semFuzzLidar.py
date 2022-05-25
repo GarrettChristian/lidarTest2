@@ -12,74 +12,85 @@ from globals import Mutation
 from globals import Transformations
 import globals
 
-from mongoUtil import mongoConnect
+from mongoUtil import mongoConnect, saveMutation
 from mongoUtil import getRandomAssetOfType
-from mongoUtil import getRandomAssetWithinScene
-from fileIoUtil import openLabelBinFiles
-from open3dUtil import assetIntersectsWalls, rotatePoints, pointsAboveGround, mirrorPoints
+from mongoUtil import getRandomAssetScene
+from fileIoUtil import openLabelBinFiles, saveToBin
+from open3dUtil import assetIntersectsWalls, pointsWithinDist, rotatePoints, pointsAboveGround, mirrorPoints, getValidRotations
 from open3dUtil import assetIsNotObsured
 from open3dUtil import removeLidarShadow
+import open3dUtil
 
 # -------------------------------------------------------------
 
 
 
-# ----------------------------------------------------------
+
+def intensityChange(pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, type):
+
+    mask = np.ones(np.shape(intensityAsset), dtype=bool)
+
+    if (type in globals.vehicles):    
+        dists = open3dUtil.nearestNeighbors(intensityAsset, 2)
+        class0 = intensityAsset[dists[:, 1] == 0]
+        class1 = intensityAsset[dists[:, 1] == 1]
+
+        mask = dists[:, 1] == 0
+        if np.shape(class0)[0] < np.shape(class1)[0]:
+            mask = dists[:, 1] == 1
+
+    mod = random.uniform(.1, .3)
+
+    
+    print("Intensity {}".format(mod))
+    
+    print(mask)
+    print(intensityAsset)
+    intensityAsset = np.where(mask, intensityAsset + mod, intensityAsset)
+    print(intensityAsset)
+
+    return pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset
 
 
-def performMutation():
+def remove(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, instanceAsset):
 
-    # Select Seed
-    idx = random.choice(range(len(globals.labelFiles)))
-    print(globals.binFiles[idx])
+    pcdArr = pcdArr[labelInstance != instanceAsset]
+    intensity = intensity[labelInstance != instanceAsset]
+    semantics = semantics[labelInstance != instanceAsset]
+    labelInstance = labelInstance[labelInstance != instanceAsset]
 
-    # Select Mutation
-    mutation = random.choice(globals.mutationsEnabled)
-    print(mutation)
-
-    # Base:
-    pcdArr, intensity, semantics, labelInstance = openLabelBinFiles(globals.binFiles[idx], globals.labelFiles[idx])
-    pcdArrAsset = None
-    intensityAsset = None
-    semanticsAsset = None
-    labelInstanceAsset = None
-
-    if (Mutation.ADD == mutation):
-        pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset = getRandomAssetOfType(10)
-        
-
-    elif (Mutation.COPY == mutation):
-        pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset = getRandomAssetWithinScene(10)
-
-    elif (Mutation.REMOVE == mutation):
-        print("TODO")
-
-    else:
-        print("ERROR: {} NOT SUPPORTED".format())
+    return open3dUtil.replaceBasedOnShadow(pcdArrAsset, pcdArr, intensity, semantics, labelInstance)
 
 
+def rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, transformation):
     attempts = 0
     success = False
-    while (attempts < 10 and not success):
-        pcdArrAssetNew = np.copy(pcdArrAsset)
-                
-        transformation = random.choice(globals.tranformationsEnabled)
-        
-        if (Transformations.ROTATE == transformation or Transformations.ROTATE_MIRROR == transformation):
-            rotateDeg = globals.rotation
-            if (not rotateDeg):
-                rotateDeg = random.randint(0, 360)
-            print(rotateDeg)
-            pcdArrAssetNew = rotatePoints(pcdArrAssetNew, rotateDeg)
-            
-        # elif (Transformations.MIRROR == transformation or Transformations.ROTATE_MIRROR == transformation):
-        if (Transformations.ROTATE_MIRROR == transformation):
+    degrees = []
+    
+
+    if (Transformations.ROTATE_MIRROR == transformation):
             axis = globals.mirrorAxis
             if (not axis):
                 axis = random.randint(0, 1)
             print("Mirror Axis: {}".format(axis))
-            pcdArrAssetNew = mirrorPoints(pcdArrAssetNew, axis)
+            pcdArrAsset = mirrorPoints(pcdArrAsset, axis)
+
+    if (Transformations.ROTATE_MIRROR == transformation or Transformations.ROTATE == transformation):
+        degrees = getValidRotations(pcdArrAsset, pcdArr, semantics)
+
+        print(degrees)
+    
+    while (attempts < 10 and not success):
+        pcdArrAssetNew = np.copy(pcdArrAsset)
         
+        if (Transformations.ROTATE == transformation 
+            or Transformations.ROTATE_MIRROR == transformation):
+            
+            rotateDeg = globals.rotation
+            if (not rotateDeg):
+                rotateDeg = random.choice(degrees)
+            print(rotateDeg)
+            pcdArrAssetNew = rotatePoints(pcdArrAssetNew, rotateDeg)
 
         # Get asset box
         pcdAsset = o3d.geometry.PointCloud()
@@ -104,12 +115,12 @@ def performMutation():
             print("Not in walls")
 
             print("Check on Road")
-            success = success and pointsAboveGround(pcdArrAssetNew, pcdArr, semantics)
+            success = pointsAboveGround(pcdArrAssetNew, pcdArr, semantics) or pointsWithinDist(pcdArrAssetNew) 
             if (success):
                 print("On Road")
 
                 print("Check unobsuccured")
-                success = success and assetIsNotObsured(pcdArrAssetNew, pcdArr, semantics)
+                success = assetIsNotObsured(pcdArrAssetNew, pcdArr, semantics)
                 if (success):
                     print("Asset Unobscured")
                     pcdArrAsset = pcdArrAssetNew
@@ -122,8 +133,9 @@ def performMutation():
                     labelInstance = np.hstack((labelInstance, labelInstanceAsset))
 
         attempts += 1
-        
-    # Visualize the mutation if enabled
+
+
+     # Visualize the mutation if enabled
     if success and globals.visualize:
 
         # Get asset box
@@ -143,6 +155,106 @@ def performMutation():
         pcdScene.colors = o3d.utility.Vector3dVector(colors)
 
         o3d.visualization.draw_geometries([hull_ls, pcdScene])
+    
+    return success, pcdArr, intensity, semantics, labelInstance
+
+# ----------------------------------------------------------
+
+
+def performMutation():
+
+    # Select Seed
+    idx = random.choice(range(len(globals.labelFiles)))
+    print(globals.binFiles[idx])
+
+    # Select Mutation
+    mutation = random.choice(globals.mutationsEnabled)
+
+    transformation = random.choice(globals.tranformationsEnabled)
+
+    print(mutation, transformation)
+
+    # Base:
+    pcdArr, intensity, semantics, labelInstance = openLabelBinFiles(globals.binFiles[idx], globals.labelFiles[idx])
+    pcdArrAsset = None
+    intensityAsset = None
+    semanticsAsset = None
+    labelInstanceAsset = None
+    assetRecord = None
+
+    success = False
+    if (Mutation.ADD == mutation):
+        pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, assetRecord = getRandomAssetOfType(10)
+        print(assetRecord)
+
+    elif (Mutation.SCENE == mutation):
+        pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, assetRecord = getRandomAssetScene(globals.binFiles[idx])
+        print(assetRecord)
+        
+    else:
+        print("ERROR: {} NOT SUPPORTED".format())
+
+    if (Transformations.INTENSITY == transformation):
+        pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset  = intensityChange(pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, assetRecord["typeNum"])
+        pcdArr, intensity, semantics, labelInstance = open3dUtil.combineRemoveInstance(pcdArr, intensity, semantics, labelInstance,
+                                                                            pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, assetRecord["instance"])
+        success = True
+
+        # Visualize the mutation if enabled
+        if success and globals.visualize:
+
+            # Get asset box
+            pcdAsset = o3d.geometry.PointCloud()
+            pcdAsset.points = o3d.utility.Vector3dVector(pcdArrAsset)
+            hull, _ = pcdAsset.compute_convex_hull()
+            hull_ls = o3d.geometry.LineSet.create_from_triangle_mesh(hull)
+            hull_ls.paint_uniform_color((0, 0, 1))
+
+            # Get scene
+            pcdScene = o3d.geometry.PointCloud()
+            pcdScene.points = o3d.utility.Vector3dVector(pcdArr)
+
+            # Color as intensity
+            colors = np.zeros(np.shape(pcdArr), dtype=np.float64)
+            colors[:, 0] = intensity
+            pcdScene.colors = o3d.utility.Vector3dVector(colors)
+
+            o3d.visualization.draw_geometries([hull_ls, pcdScene])
+
+    elif (Transformations.REMOVE == transformation):
+        pcdArr, intensity, semantics, labelInstance = remove(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, assetRecord["instance"])
+        success = True
+
+        # Visualize the mutation if enabled
+        if success and globals.visualize:
+
+            # Get asset box
+            pcdAsset = o3d.geometry.PointCloud()
+            pcdAsset.points = o3d.utility.Vector3dVector(pcdArrAsset)
+            hull, _ = pcdAsset.compute_convex_hull()
+            hull_ls = o3d.geometry.LineSet.create_from_triangle_mesh(hull)
+            hull_ls.paint_uniform_color((0, 0, 1))
+
+            # Get scene
+            pcdScene = o3d.geometry.PointCloud()
+            pcdScene.points = o3d.utility.Vector3dVector(pcdArr)
+
+            # Color as intensity
+            colors = np.zeros(np.shape(pcdArr), dtype=np.float64)
+            colors[:, 0] = intensity
+            pcdScene.colors = o3d.utility.Vector3dVector(colors)
+
+            o3d.visualization.draw_geometries([hull_ls, pcdScene])
+    elif (Transformations.ROTATE_MIRROR == transformation or Transformations.ROTATE == transformation):
+        success, pcdArr, intensity, semantics, labelInstance = rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, 
+                                                                intensityAsset, semanticsAsset, labelInstanceAsset, transformation)
+
+       
+
+    if (success):
+        saveMutation("tmp")
+        saveToBin(pcdArr, intensity, labelInstance, "test.bin")
+    
 
 # -------------------------------------------------------------
 
@@ -173,6 +285,9 @@ def parse_args():
     p.add_argument('-rotate', help='Value to rotate', required=False)
     p.add_argument('-mirror', help='Value to mirror', required=False)
     p.add_argument('-intensity', help='Value to change intensity', required=False)
+
+
+    p.add_argument('-asset', help='Specific assetId to load', required=False)
 
 
     return p.parse_args()

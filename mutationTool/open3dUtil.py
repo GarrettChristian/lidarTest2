@@ -1,9 +1,10 @@
 
 
+from xml.etree.ElementInclude import include
 import numpy as np
 import open3d as o3d
 import math
-
+from sklearn.neighbors import NearestNeighbors
 
 from globals import centerCamPoint
 from globals import centerArea
@@ -103,38 +104,21 @@ def pointsAboveGround(points, scene, semantics):
 
     return sum(included) >= (len(included) / 3)
 
-
-def assetIsValid(asset, sceneWithoutInstance):
-
-    pcdAsset = o3d.geometry.PointCloud()
-    pcdAsset.points = o3d.utility.Vector3dVector(asset)
-
-    #  Get the asset's bounding box
-    obb = pcdAsset.get_oriented_bounding_box()
-    boxPoints = np.asarray(obb.get_box_points())
+"""
+Checks that all points exist above the ground
+"""
+def pointsWithinDist(points):
     
+    pcdPoints = o3d.geometry.PointCloud()
+    pcdPoints.points = o3d.utility.Vector3dVector(points)
+    obb = pcdPoints.get_oriented_bounding_box()
+    centerOfPoints = obb.get_center()
 
-    boxVertices = np.vstack((boxPoints, centerCamPoint))
+    dist = np.linalg.norm(centerOfPoints - centerCamPoint)
 
-    pcdCastHull = o3d.geometry.PointCloud()
-    pcdCastHull.points = o3d.utility.Vector3dVector(boxVertices)
-    hull2, _ = pcdCastHull.compute_convex_hull()
-    hull_ls = o3d.geometry.LineSet.create_from_triangle_mesh(hull2)
+    return dist < 5
+
     
-    assetCenter = obb.get_center()
-
-    # Dist is acceptable
-    dist = np.linalg.norm(centerCamPoint - assetCenter)
-    if dist > 50:
-        return hull_ls, False
-    
-    incuded = checkInclusionBasedOnTriangleMeshAsset(sceneWithoutInstance, hull2)
-    if (incuded):
-        hull_ls.paint_uniform_color((1, 0.2, 0.2))
-    else:
-        hull_ls.paint_uniform_color((0.2, 1, 0.2))
-
-    return hull_ls, not incuded
 
 
 def removeLidarShadowLines(asset):
@@ -178,77 +162,23 @@ def removeLidarShadowLines(asset):
     return hull_ls
 
 
-def viewOne(binFileName, labelsFileName):
-    print(binFileName)
-    print(labelsFileName)
+def combineRemoveInstance(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, assetInstance):
+    pcdArrWithoutAsset = pcdArr[labelInstance != assetInstance]
+    intensityWithoutAsset = intensity[labelInstance != assetInstance]
+    semanticsWithoutAsset = semantics[labelInstance != assetInstance]
+    labelInstanceWithoutAsset = labelInstance[labelInstance != assetInstance]
 
-    # Label
-    label_arr = np.fromfile(labelsFileName, dtype=np.int32)
-    semantics = label_arr & 0xFFFF
-    labelInstance = label_arr >> 16 
-
-    # Bin File
-    pcdArr = np.fromfile(binFileName, dtype=np.float32)
-    pcdArr = pcdArr.reshape((int(np.shape(pcdArr)[0]) // 4, 4))
-    pcdArr = np.delete(pcdArr, 3, 1)
-
-    seenInst = set()
-    for instance in labelInstance:
-        seenInst.add(instance)
-    
-    pcdScene = o3d.geometry.PointCloud()
-    pcdScene.points = o3d.utility.Vector3dVector(pcdArr)
-        
-
-    # mask1 = (semantics != 40) & (semantics != 44) & (semantics != 48) & (semantics != 49) & (semantics != 60) & (semantics != 72)
-    # tmp = pcdArr[mask1, :]
-    # pcdScene = o3d.geometry.PointCloud()
-    # pcdScene.points = o3d.utility.Vector3dVector(tmp)
-
-    display = [pcdScene]
-    
-    pcdCenter = o3d.geometry.PointCloud()
-    pcdCenter.points = o3d.utility.Vector3dVector(centerArea)
-
-    #  Get the asset's bounding box
-    centerBox = pcdCenter.get_oriented_bounding_box()
-    centerBox.color = (0.1, 0.2, 0.2)
-    display.append(centerBox)
-
-    for instance in seenInst:
-        if instance != 0:
-            instancePoints = pcdArr[labelInstance == instance]
-
-            if (np.shape(instancePoints)[0] > 20):
-                pcdItem = o3d.geometry.PointCloud()
-                pcdItem.points = o3d.utility.Vector3dVector(instancePoints)
-                hull, _ = pcdItem.compute_convex_hull()
-                hull_ls = o3d.geometry.LineSet.create_from_triangle_mesh(hull)
-                hull_ls.paint_uniform_color((0, 0, 1))
+    return combine(pcdArrWithoutAsset, intensityWithoutAsset, semanticsWithoutAsset, labelInstanceWithoutAsset, 
+                    pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset)
 
 
-                maskInst = (labelInstance != instance) & (semantics != 40) & (semantics != 44) & (semantics != 48) & (semantics != 49) & (semantics != 60) & (semantics != 72)
-                pcdWithoutInstance = pcdArr[maskInst, :]
+def combine(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset):
+    pcdArrCombined = np.vstack((pcdArr, pcdArrAsset))
+    intensityCombined = np.hstack((intensity, intensityAsset))
+    semanticsCombined = np.hstack((semantics, semanticsAsset))
+    labelInstanceCombined = np.hstack((labelInstance, labelInstanceAsset))
 
-                boxToVel, valid = assetIsValid(instancePoints, pcdWithoutInstance)
-                
-
-                display.append(hull_ls)
-                if (valid):
-                    display.append(removeLidarShadowLines(instancePoints))
-                    display.append(boxToVel)
-                    # display.append(hullToVelLines(instancePoints, pcdWithoutInstance))
-
-                # get_oriented_bounding_box
-                # get_axis_aligned_bounding_box
-                obb = pcdItem.get_oriented_bounding_box()
-                obb.color = (0.7, 0, 1)
-                display.append(obb)
-
-
-
-    o3d.visualization.draw_geometries(display)
-
+    return pcdArrCombined, intensityCombined, semanticsCombined, labelInstanceCombined
 
 
 # -------------------------------------------------------------
@@ -299,8 +229,10 @@ def mirrorPoints(points, axis):
 Translate a group of points to a new location based on the center
 """
 def translatePointsXY(points, destination):
+    pointsCopy = np.copy(points)
+
     pcdPoints = o3d.geometry.PointCloud()
-    pcdPoints.points = o3d.utility.Vector3dVector(points)
+    pcdPoints.points = o3d.utility.Vector3dVector(pointsCopy)
     obb = pcdPoints.get_oriented_bounding_box()
     centerOfPoints = obb.get_center()
 
@@ -309,19 +241,23 @@ def translatePointsXY(points, destination):
     addX = destination[X_AXIS] - point[X_AXIS]
     addY = destination[Y_AXIS] - point[Y_AXIS]
 
-    points[:, X_AXIS] = points[:, X_AXIS] + addX
-    points[:, Y_AXIS] = points[:, Y_AXIS] + addY
+    pointsCopy[:, X_AXIS] = pointsCopy[:, X_AXIS] + addX
+    pointsCopy[:, Y_AXIS] = pointsCopy[:, Y_AXIS] + addY
 
-    return points
+    return pointsCopy
 
+
+def rotateOnePoint(origin, point, angle):
+
+    radians = (angle * math.pi) / 180
+    rotateOnePointRadians(origin, point, radians)
 
 """
 Rotate a point counterclockwise by a given angle around a given origin.
+In radians
 https://stackoverflow.com/questions/34372480/rotate-point-about-another-point-in-degrees-python
 """
-def rotateOnePoint(origin, point, angle):    
-
-    radians = (angle * math.pi) / 180
+def rotateOnePointRadians(origin, point, radians):
 
     ox, oy = origin
     px, py = point
@@ -375,21 +311,14 @@ def rotatePoints(points, angle):
     if (angle == 0 or angle == 360):
         return points
 
-    # Rotate the points relative to their center 
-    points = rotatePointsLocalized(points, angle)
+    pointsRotated = np.copy(points)
+    for point in pointsRotated:
+        pt = (point[X_AXIS], point[Y_AXIS])
+        newLocation = rotateOnePoint((0, 0), pt, angle)
+        point[X_AXIS] = newLocation[X_AXIS]
+        point[Y_AXIS] = newLocation[Y_AXIS]
 
-    pcdPoints = o3d.geometry.PointCloud()
-    pcdPoints.points = o3d.utility.Vector3dVector(points)
-    obb = pcdPoints.get_oriented_bounding_box()
-    centerOfPoints = obb.get_center()
-
-    point = (centerOfPoints[0], centerOfPoints[1])
-
-    newLocation = rotateOnePoint((0, 0), point, angle)
-
-    points = translatePointsXY(points, newLocation)
-
-    return points
+    return pointsRotated
 
 
 """
@@ -422,26 +351,20 @@ def checkInclusionBasedOnTriangleMesh(points, mesh):
 
     return mask
 
-"""
-Removes the LiDAR shadow by casting lines based on the hull of the asset
-Then deleteing if the points are found within the polygon
 
+"""
 https://math.stackexchange.com/questions/83404/finding-a-point-along-a-line-in-three-dimensions-given-two-points
 """
-def removeLidarShadow(asset, scene, intensity, semantics, labelsInstance):
+def getLidarShadowMesh(asset):
 
     # Prepare asset and scene point clouds
     pcdAsset = o3d.geometry.PointCloud()
     pcdAsset.points = o3d.utility.Vector3dVector(asset)
 
-    pcdScene = o3d.geometry.PointCloud()
-    pcdScene.points = o3d.utility.Vector3dVector(scene)
-
     #  Get the asset's hull mesh
     hull, _ = pcdAsset.compute_convex_hull()
     hullVertices = np.asarray(hull.vertices)
     
-    centerCamPoint = np.array([0, 0, -0.5])
     castHullPoints = np.array([])
     for point1 in hullVertices:
 
@@ -460,21 +383,205 @@ def removeLidarShadow(asset, scene, intensity, semantics, labelsInstance):
     pcdCastHull.points = o3d.utility.Vector3dVector(castHullPoints)
     hull2, _ = pcdCastHull.compute_convex_hull()
 
-    hull2.scale(0.5, hull2.get_center())
+    # hull2.scale(0.5, hull2.get_center())
     hull2Vertices = np.asarray(hull2.vertices)
 
     combinedVertices = np.vstack((hullVertices, hull2Vertices))
 
-    pcdCut = o3d.geometry.PointCloud()
-    pcdCut.points = o3d.utility.Vector3dVector(combinedVertices)
-    cutPointsHull, _ = pcdCut.compute_convex_hull()
+    pcdShadow = o3d.geometry.PointCloud()
+    pcdShadow.points = o3d.utility.Vector3dVector(combinedVertices)
+    shadowMesh, _ = pcdShadow.compute_convex_hull()
+
+    return shadowMesh
+
+
+"""
+Removes the LiDAR shadow by casting lines based on the hull of the asset
+Then deleteing if the points are found within the polygon
+"""
+def removeLidarShadow(asset, scene, intensity, semantics, labelsInstance):
+
+    cutPointsHull = getLidarShadowMesh(asset)
 
     mask = checkInclusionBasedOnTriangleMesh(scene, cutPointsHull)
     mask = np.logical_not(mask)
 
-    scene = scene[mask, :]
-    intensity = intensity[mask]
-    semantics = semantics[mask]
-    labelsInstance = labelsInstance[mask]
+    sceneResult = scene[mask, :]
+    intensityResult = intensity[mask]
+    semanticsResult = semantics[mask]
+    labelsInstanceResult = labelsInstance[mask]
 
-    return (scene, intensity, semantics, labelsInstance)
+    return (sceneResult, intensityResult, semanticsResult, labelsInstanceResult)
+
+
+
+"""
+Removes the LiDAR shadow by casting lines based on the hull of the asset
+Then deleteing if the points are found within the polygon
+"""
+def replaceBasedOnShadow(asset, scene, intensity, semantics, labelsInstance):
+
+    shadow = getLidarShadowMesh(asset)
+
+    #  Get the asset's bounding box
+    pcdAsset = o3d.geometry.PointCloud()
+    pcdAsset.points = o3d.utility.Vector3dVector(asset)
+    obb = pcdAsset.get_oriented_bounding_box()
+
+    # Create a triangle from the oriented box    
+    minBox = obb.get_min_bound()
+    maxBox = obb.get_max_bound()
+
+    radians = getAngleRadians((minBox[X_AXIS], minBox[Y_AXIS]), (maxBox[X_AXIS], maxBox[Y_AXIS]))
+    angle = (radians * 180) / math.pi
+    print(radians)
+    print(angle)
+
+    shadowVertices = np.asarray(shadow.vertices)
+    
+    for vertice in shadowVertices:
+        print(vertice)
+        newX, newY = rotateOnePointRadians((0, 0), (vertice[X_AXIS], vertice[Y_AXIS]), radians)
+        vertice[X_AXIS] = newX
+        vertice[Y_AXIS] = newY
+        print(vertice)
+
+    pcdCastHull = o3d.geometry.PointCloud()
+    pcdCastHull.points = o3d.utility.Vector3dVector(shadowVertices)
+    shadowRotated, _ = pcdCastHull.compute_convex_hull()
+
+    maskIncluded = checkInclusionBasedOnTriangleMesh(scene, shadowRotated)
+    maskNotIncluded = np.logical_not(maskIncluded)
+
+    print(maskIncluded)
+
+    sceneInMesh = scene[maskIncluded, :]
+    intensityInMesh = intensity[maskIncluded]
+    semanticsInMesh = semantics[maskIncluded]
+    labelsInstanceInMesh = labelsInstance[maskIncluded]
+
+    sceneNotInMesh = scene[maskNotIncluded, :]
+    intensityNotInMesh = intensity[maskNotIncluded]
+    semanticsNotInMesh = semantics[maskNotIncluded]
+    labelsInstanceNotInMesh = labelsInstance[maskNotIncluded]
+
+    for point in sceneInMesh:
+        newX, newY = rotateOnePointRadians((0, 0), (point[X_AXIS], point[Y_AXIS]), radians)
+        point[X_AXIS] = newX
+        point[Y_AXIS] = newY
+    
+    return combine(sceneNotInMesh, intensityNotInMesh, semanticsNotInMesh, labelsInstanceNotInMesh,
+                    sceneInMesh, intensityInMesh, semanticsInMesh, labelsInstanceInMesh)
+
+
+def removeCenterPoints(points):
+
+    pointsVector = o3d.utility.Vector3dVector(points)
+
+    pcdCenter = o3d.geometry.PointCloud()
+    pcdCenter.points = o3d.utility.Vector3dVector(centerArea)
+
+    #  Get the asset's bounding box
+    centerBox = pcdCenter.get_oriented_bounding_box()
+    ignoreIndex = centerBox.get_point_indices_within_bounding_box(pointsVector)
+    
+    mask = np.ones(np.shape(points)[0], dtype=int)
+    mask[ignoreIndex] = 0
+
+    pointsWithoutCenter = points[mask == 1]
+    return pointsWithoutCenter
+
+
+# https://stackoverflow.com/questions/2049582/how-to-determine-if-a-point-is-in-a-2d-triangle
+# https://math.stackexchange.com/questions/190111/how-to-check-if-a-point-is-inside-a-rectangle
+def pointInTriangle (p0, p1, p2, point):
+    p0x, p0y = p0
+    p1x, p1y = p1
+    p2x, p2y = p2
+    px, py = point
+    Area = 0.5 *(-p1y*p2x + p0y*(-p1x + p2x) + p0x*(p1y - p2y) + p1x*p2y)
+    s = 1/(2*Area)*(p0y*p2x - p0x*p2y + (p2y - p0y)*px + (p0x - p2x)*py)
+    t = 1/(2*Area)*(p0x*p1y - p0y*p1x + (p0y - p1y)*px + (p1x - p0x)*py)
+
+    return s > 0 and t > 0 and ((1 - s) - t) > 0
+
+
+def getValidRotations(points, scene, semantics):
+
+    # Remove the road
+    maskNotGround = (semantics != 40) & (semantics != 44) & (semantics != 48) & (semantics != 49) & (semantics != 60) & (semantics != 72)
+    pcdArrExceptGround = scene[maskNotGround, :]
+
+    # Ignore anything in center
+    pcdArrExceptGround[:, Z_AXIS] = 0
+    sceneWithoutCenter = removeCenterPoints(pcdArrExceptGround)
+    
+    # Create a set of unique points
+    uniquePoints = set()
+    for point in sceneWithoutCenter:
+        pt = (point[X_AXIS], point[Y_AXIS])
+        uniquePoints.add(pt)
+
+    #  Get the asset's bounding box
+    pcdAsset = o3d.geometry.PointCloud()
+    pcdAsset.points = o3d.utility.Vector3dVector(points)
+    obb = pcdAsset.get_oriented_bounding_box()
+
+    # Create a triangle from the oriented box    
+    minBox = obb.get_min_bound()
+    maxBox = obb.get_max_bound()
+    triangle = np.asarray([centerCamPoint, maxBox, minBox])
+    
+    degrees = []
+
+    for deg in range(0, 360):
+        triangleRotated = rotatePoints(triangle, deg)
+
+        p0 = (triangleRotated[0][X_AXIS], triangleRotated[0][Y_AXIS])
+        p1 = (triangleRotated[1][X_AXIS], triangleRotated[1][Y_AXIS])
+        p2 = (triangleRotated[2][X_AXIS], triangleRotated[2][Y_AXIS])
+
+        empty = True
+        for point in uniquePoints:
+            # print(point)
+            empty = empty and not pointInTriangle(p0, p1, p2, point)
+        
+        if (empty): 
+            degrees.append(deg)
+            
+    return degrees
+
+
+
+
+# https://stackoverflow.com/questions/45742199/find-nearest-neighbors-of-a-numpy-array-in-list-of-numpy-arrays-using-euclidian
+def nearestNeighbors(values, nbr_neighbors):
+
+    zeroCol = np.zeros((np.shape(values)[0],), dtype=bool)
+    valuesResized = np.c_[values, zeroCol]
+    # np.append(np.array(values), np.array(zeroCol), axis=1)
+    # valuesResized = np.hstack((np.array(values), np.array(zeroCol)))
+
+    nn = NearestNeighbors(n_neighbors=nbr_neighbors, metric='cosine', algorithm='brute').fit(valuesResized)
+    dists, idxs = nn.kneighbors(valuesResized)
+
+    return dists
+
+
+
+# https://stackoverflow.com/questions/1211212/how-to-calculate-an-angle-from-three-points
+def getAngleRadians(p1, p2):
+    p0x, p0y, _= centerCamPoint
+    p1x, p1y = p1
+    p2x, p2y = p2
+
+    # result = math.atan2(p2y - p0y, p2x - p0x) - math.atan2(p1y - p0y, p1x - p1x)
+    # return result
+    a = np.asarray(p0x - p1x, p0y - p1y)
+    b = np.asarray(p1x - p2x, p0y - p2y)
+
+    return np.arccos((a * b) / (np.absolute(a) * np.absolute(b)))
+
+
+
+

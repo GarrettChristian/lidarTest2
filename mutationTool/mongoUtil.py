@@ -1,12 +1,11 @@
 
-
 from pymongo import MongoClient
 
 
 import globals
 from fileIoUtil import openLabelBin
 import numpy as np
-
+import os
 
 
 assetCollection = None
@@ -52,8 +51,23 @@ def getInstanceFromAssetRecord(assetRecord):
     semantics = semantics[maskOnlyInst]
     labelInstance = labelInstance[maskOnlyInst]
 
-    return pcdArr, intensity, semantics, labelInstance 
+    return pcdArr, intensity, semantics, labelInstance, assetRecord
 
+
+"""
+Gets a random asset from a specific sequence scene of type
+"""
+def getRandomAssetScene(binFilePath):
+
+    head_tail = os.path.split(binFilePath)
+    scene = head_tail[1]
+    scene = scene.replace('.bin', '')
+  
+    head_tail = os.path.split(head_tail[0])
+    head_tail = os.path.split(head_tail[0])
+    sequence = head_tail[1]
+
+    return getRandomAssetWithinScene(sequence, scene)
 
 
 """
@@ -87,12 +101,9 @@ def getRandomAssetOfType(typeNum):
 """
 Gets an asset by the id
 """
-def getRandomAssetWithinScene(sequence, scene):
+def getAssetById(id):
 
-    asset = assetCollection.aggregate([
-        { "$match": { "sequence" : sequence, "scene" : scene} },
-        { "$sample": { "size": 1 } }
-    ])
+    asset = assetCollection.find_one({ "_id" : id })
 
     return getInstanceFromAssetRecord(asset.next())
 
