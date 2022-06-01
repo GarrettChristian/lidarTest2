@@ -171,6 +171,34 @@ class LaserScan:
     self.proj_idx[proj_y, proj_x] = indices
     self.proj_mask = (self.proj_idx > 0).astype(np.float32)
 
+
+    nonZero = 0
+
+    for y in range(0, self.proj_H):
+      for x in range(0, self.proj_W):
+        print(self.proj_range[y, x])
+        if (self.proj_range[y, x] != -1):
+          nonZero += 1
+
+    print(np.size(depth))
+    print(nonZero)
+
+
+    proj_x2 = proj_x / self.proj_W
+    proj_y2 = proj_y / self.proj_H
+
+    yaw2 = np.pi * ((proj_x2 / 0.5) - 1)
+    # proj_y2 = 1.0 - (pitch + abs(fov_down)) / fov        # in [0.0, 1.0]
+
+    print(yaw)
+    print(yaw2)
+    print(fov)
+    print(fov_down)
+
+
+
+
+
 class LaserScanVis:
   """Class that creates and handles a visualizer for a pointcloud"""
 

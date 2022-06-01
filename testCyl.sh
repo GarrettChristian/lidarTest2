@@ -12,7 +12,7 @@ echo "run visualizer"
 
 cd /home/garrett/Documents/semantic-kitti-api/
 
-./visualize.py --sequence 00 --dataset /home/garrett/Documents/data/tmp/dataset/
+# ./visualize.py --sequence 00 --dataset /home/garrett/Documents/data/tmp/dataset/
 
 
 

@@ -80,7 +80,14 @@ def getRandomAssetWithinScene(sequence, scene):
         { "$sample": { "size": 1 } }
     ])
 
-    return getInstanceFromAssetRecord(asset.next())
+    assetRecord = None
+    try:
+        assetRecord = asset.next()
+    except:
+        print("Get assetRecord failed")
+        return None, None, None, None, None
+
+    return getInstanceFromAssetRecord(assetRecord)
 
 
 
@@ -94,7 +101,14 @@ def getRandomAssetOfType(typeNum):
         { "$sample": { "size": 1 } }
     ])
 
-    return getInstanceFromAssetRecord(asset.next())
+    assetRecord = None
+    try:
+        assetRecord = asset.next()
+    except:
+        print("Get assetRecord failed")
+        return None, None, None, None, None
+
+    return getInstanceFromAssetRecord(assetRecord)
 
 
 
@@ -114,7 +128,7 @@ Save mutation data
 """
 def saveMutation(mutationData):
 
-    print("SAVE TODO")
+    print("Save Mutation Record (TODO)")
 
 
 

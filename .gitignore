@@ -131,6 +131,14 @@ dmypy.json
 
 
 
+# New additions 
 
+# Hidden mongo connection with password
 mongoconnect.txt
+
+# Bin and label files produced 
+*.bin
+*.label
+
+
 

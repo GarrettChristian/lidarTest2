@@ -17,7 +17,7 @@ name_label_mapping = {
     16: 'on-rails',
     18: 'truck',
     20: 'other-vehicle',
-    20: 'person',
+    30: 'person',
     31: 'bicyclist',
     32: 'motorcyclist',
     40: 'road',
@@ -51,7 +51,7 @@ instances = {
     15: 'motorcycle',
     18: 'truck',
     20: 'other-vehicle',
-    20: 'person',
+    30: 'person',
     31: 'bicyclist',
     32: 'motorcyclist',
     252: 'moving-car',
@@ -80,23 +80,6 @@ instancesVehicle = {
 }
 
 
-X_AXIS = 0
-Y_AXIS = 1
-Z_AXIS = 2
-I_AXIS = 3
-
-centerCamPoint = np.array([0, 0, 0.3])
-
-centerArea = np.array([
-            [ -2.5, -2.5, -3], # bottom right
-            [ -2.5, -2.5, 3], 
-            [ -2.5, 2.5, -3], # top right
-            [ -2.5, 2.5, 3],
-            [ 2.5, 2.5, -3], # top left
-            [ 2.5, 2.5, 3],
-            [ 2.5, -2.5, -3], # bottom left
-            [ 2.5, -2.5, 3], 
-            ]).astype("float64")
 
 
 
@@ -105,10 +88,38 @@ class Mutation(Enum):
     ADD = "ADD" # New Asset
     SCENE = "SCENE" # make a copy of the asset
     # MOVE = "MOVE" # remove the asset and place somewhere else
+
+# Enum of the different types of mutations supported
+class Asset(Enum):
+    ADD = "ADD" # New Asset
+    SCENE = "SCENE" # Asset in a scene
+
+class Transformation(Enum):
+    ROTATE = "ROTATE",
+    MIRROR = "MIRROR",
+    INTENSITY = "INTENSITY"
+    REMOVE = "REMOVE",
+    NOISE = "NOISE"
+    TRANSLATE = "TRANSLATE"
     
 
-# Transformations for add / copy
 class Transformations(Enum):
+    ADD_ROTATE = "ADD_ROTATE",
+    ADD_MIRROR_ROTATE = "ADD_MIRROR_ROTATE",
+    ADD_SCALE_ROTATE = "ADD_SCALE_ROTATE"
+    SCENE_INTENSITY = "SCENE_INTENSITY"
+    SCENE_REMOVE = "SCENE_REMOVE",
+    SCENE_NOISE = "SCENE_NOISE"
+    SCENE_REMOVE_TRANSLATE = "SCENE_REMOVE_TRANSLATE"
+    SCENE_REMOVE_ROTATE = "SCENE_REMOVE_ROTATE"
+    SCENE_SPARSIFY = "SCENE_SPARSIFY"
+    SCENE_DENSIFY = "SCENE_DENSIFY"
+
+
+
+
+# Transformations for add / copy
+class TransformationsZ(Enum):
     # LOCAL_ROTATE = "LOCAL_ROTATE_IN_SCENE"
     ROTATE = "ROTATE"
     # TRANSLATE = "TRANSLATE"
@@ -134,6 +145,10 @@ intensityChange = None
 
 
 vehicles = set()
+
+
+saveLabelPath = ""
+saveBinPath = ""
 
 
 # ---------------------------------------------------------------
@@ -244,6 +259,10 @@ def init(args):
     tranformationsEnabled = []
     path = ""
     visualize = ""
+    
+    saveLabelPath = ""
+    saveBinPath = ""
+    saveMutationPath = ""
 
     mutationsEnabled = prepareMutations(args.m)
     tranformationsEnabled = prepareTransformations(args.t)
@@ -261,6 +280,10 @@ def init(args):
 
     for vehicle in instancesVehicle.keys():
         vehicles.add(vehicle)
+
+
+
+    
 
 
 

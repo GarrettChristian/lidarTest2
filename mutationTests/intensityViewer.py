@@ -19,7 +19,7 @@ name_label_mapping = {
         16: 'on-rails',
         18: 'truck',
         20: 'other-vehicle',
-        20: 'person',
+        30: 'person',
         31: 'bicyclist',
         32: 'motorcyclist',
         40: 'road',

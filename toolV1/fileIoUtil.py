@@ -9,10 +9,20 @@ import numpy as np
 """
 Saves a modified bin file and label file rejoining the intensity 
 """
-def saveToBin(xyz, intensity, labels, file):
+def saveToBin(xyz, intensity, semantics, labelsInstance, file):
+    binFile = file + ".bin"
+    labelFile = file + ".label"
+
+    labelsCombined = (labelsInstance << 16) | (semantics & 0xFFFF)
+
     xyzi = np.c_[xyz, intensity]
     xyziFlat = xyzi.flatten()
-    xyziFlat.tofile(file)
+
+    xyziFlat = xyziFlat.astype(np.float32)
+    labelsCombined = labelsCombined.astype(np.int32)
+
+    xyziFlat.tofile(binFile)
+    labelsCombined.tofile(labelFile)
 
 
 """
