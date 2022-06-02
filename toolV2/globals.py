@@ -4,7 +4,7 @@ import numpy as np
 from enum import Enum
 import glob, os
 import shutil
-
+import uuid
 
 
 # -------------------------------------------------------
@@ -173,10 +173,11 @@ doneLabelSpvDir = ""
 doneLabelSalDir = ""
 
 
+
+batchId = str(uuid.uuid4())
+
+
 # ---------------------------------------------------------------
-
-
-
 
 
 def prepareMutations(mutationsGiven):

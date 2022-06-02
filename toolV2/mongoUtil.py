@@ -124,7 +124,7 @@ def getBaseAccuracy(sequence, scene, model):
     try:
         baseAccRecord = baseAcc.next()
     except:
-        print("Get assetRecord failed")
+        print("Get base accuracy failed")
 
     return baseAccRecord
 

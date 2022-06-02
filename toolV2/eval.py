@@ -288,6 +288,8 @@ def evalLabels(label_file, pred_file, model, details):
 
 
     baseAccuracy = mongoUtil.getBaseAccuracy(details["baseSequence"], details["baseScene"], model)
+    print(baseAccuracy)
+    print(details["baseSequence"], details["baseScene"], model)
 
     jacChange = results["jaccard"] - baseAccuracy["jaccard"]
     accChange = results["accuracy"] - baseAccuracy["accuracy"]

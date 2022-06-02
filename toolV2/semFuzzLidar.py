@@ -350,6 +350,7 @@ def performMutation():
     details["_id"] = mutationId
     details["time"] = int(time.time())
     details["dateTime"] = time.ctime(time.time())
+    details["batchId"] = globals.batchId
 
     # Select Seed
     idx = random.choice(range(len(globals.labelFiles)))
