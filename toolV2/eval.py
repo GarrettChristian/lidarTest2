@@ -296,14 +296,14 @@ def evalBatch(threadNum, details):
 
     # Lock mutex
     print("Lock mutex TODO")
-    
+
 
     # move the bins to the velodyne folder to run the models on them
     print("move to vel folder")
     stageVel = globals.stageDir + "/velodyne" + str(threadNum) + "/"
     allfiles = os.listdir(stageVel)
     for f in allfiles:
-        shutil.move(stageVel + f, globals.currentVelDir + "/" +  + f)
+        shutil.move(stageVel + f, globals.currentVelDir + "/" + f)
 
     # run all models on bin files
     print("Run models")
@@ -343,11 +343,11 @@ def evalBatch(threadNum, details):
 
     # Evaluate 
     print("Eval TODO")
-    stageLabel = globals.stageDir + "/velodyne" + str(threadNum)
-    labelFiles = glob.glob(stageLabel + "/*.label")
-    predFilesCyl = glob.glob(evalCylDir + "/*.label")
-    predFilesSal = glob.glob(evalSalDir + "/*.label")
-    predFilesSpv = glob.glob(evalSpvDir + "/*.label")
+    stageLabel = globals.stageDir + "/labels" + str(threadNum) + "/"
+    labelFiles = glob.glob(stageLabel + "*.label")
+    predFilesCyl = glob.glob(evalCylDir + "*.label")
+    predFilesSal = glob.glob(evalSalDir + "*.label")
+    predFilesSpv = glob.glob(evalSpvDir + "*.label")
     
     # Order the update files cronologically
     labelFiles = sorted(labelFiles)
@@ -368,21 +368,21 @@ def evalBatch(threadNum, details):
 
     # Move to done folder
     print("Move to done folder")    
-    allfiles = os.listdir(stageLabel + "/")
+    allfiles = os.listdir(stageLabel)
     for f in allfiles:
-        shutil.move(stageLabel + "/" + f, globals.doneLabelActualDir + "/" + f)
+        shutil.move(stageLabel + f, globals.doneLabelActualDir + "/" + f)
 
-    allfiles = os.listdir(evalCylDir + "/")
+    allfiles = os.listdir(evalCylDir)
     for f in allfiles:
-        shutil.move(evalCylDir + "/" + f, globals.doneLabelCylDir + "/" + f)
+        shutil.move(evalCylDir + f, globals.doneLabelCylDir + "/" + f)
 
-    allfiles = os.listdir(evalSpvDir + "/")
+    allfiles = os.listdir(evalSpvDir)
     for f in allfiles:
-        shutil.move(evalSpvDir + "/" + f, globals.doneLabelSpvDir + "/" + f)
+        shutil.move(evalSpvDir + f, globals.doneLabelSpvDir + "/" + f)
 
-    allfiles = os.listdir(evalSalDir + "/")
+    allfiles = os.listdir(evalSalDir)
     for f in allfiles:
-        shutil.move(evalSalDir + "/" + f, globals.doneLabelSalDir + "/" + f)
+        shutil.move(evalSalDir + f, globals.doneLabelSalDir + "/" + f)
 
 
     return details
