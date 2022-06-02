@@ -118,7 +118,7 @@ Gets an asset by the id
 """
 def getBaseAccuracy(sequence, scene, model):
 
-    baseAcc = assetCollection.find_one({ "sequence" : sequence, "scene": scene, "model": model })
+    baseAcc = accuracyCollection.find_one({ "sequence" : sequence, "scene": scene, "model": model })
 
     baseAccRecord = {}
     try:
