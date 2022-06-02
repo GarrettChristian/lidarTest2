@@ -610,7 +610,7 @@ def runMutations(threadNum):
     if (globals.evalMutationFlag):
         details = eval.evalBatch(threadNum, mutationDetails)
 
-        finalData = finalData(details, finalData)
+        finalData = finalDetails(details, finalData)
 
     # Save details
     if (globals.saveMutationFlag):
