@@ -9,7 +9,9 @@ import argparse
 from enum import Enum
 import uuid
 import os
+import sys
 import time
+import json
 
 
 import globals
@@ -23,6 +25,9 @@ from open3dUtil import removeLidarShadow
 import open3dUtil
 import fileIoUtil
 import eval
+
+
+
 
 # -------------------------------------------------------------
 
@@ -512,8 +517,68 @@ def performMutation():
     return success, details, xyziFinal, labelFinal
     
 
+
+
+
+def prepFinalDetails():
+    finalData = {}
+
+    models = ["cyl", "spv", "sal"]
+
+    for model in models:
+        finalData[model] = {}
+
+        for mutation in globals.mutationsEnabled:
+            mutationString = str(mutation).replace("Mutation.", "")
+
+            finalData[model][mutationString] = {}
+            finalData[model][mutationString]["five"] = []
+
+
+    for mutation in globals.mutationsEnabled:
+        mutationString = str(mutation).replace("Mutation.", "")
+        finalData[mutationString] = 0
+
+
+    return finalData
+
+
+
+def finalDetails(details, finalData):
+
+    models = ["cyl", "spv", "sal"]
+
+    for detail in details:
+        # Add count for mutation
+        finalData[detail["mutation"]] = finalData[detail["mutation"]] + 1
+
+        # Check if we have a lower accuracy change for this mutation
+        for model in models:
+
+            # don't have five yet, add it 
+            if (len(finalData[model][detail["mutation"]]["five"]) < 5):
+                finalData[model][detail["mutation"]]["five"].append((detail["_id"], detail[model]["accuracyChange"]))
+                finalData[model][detail["mutation"]]["five"].sort(key = lambda x: x[1])
+                print("< 5")
+                print(finalData[model][detail["mutation"]]["five"])
+
+            # Do have five check against current highest
+            else:
+                # new lower change to acc
+                if (finalData[model][detail["mutation"]]["five"][4] > detail[model]["accuracyChange"]):
+                    print("new low!")
+                    finalData[model][detail["mutation"]]["five"].append((detail["_id"], detail[model]["accuracyChange"]))
+                    print(finalData[model][detail["mutation"]]["five"])
+                    finalData[model][detail["mutation"]]["five"].sort(key = lambda x: x[1])
+                    finalData[model][detail["mutation"]]["five"].pop()
+                    print(finalData[model][detail["mutation"]]["five"])
+
+
+
 def runMutations(threadNum):
     
+    finalData = prepFinalDetails()
+
     # Until signaled to end
     # while()
 
@@ -522,7 +587,7 @@ def runMutations(threadNum):
     labels = []
 
     # Mutate
-    for index in range(0, 5):
+    for index in range(0, 10):
         success, details, xyziFinal, labelFinal = performMutation()
         if success:
             mutationDetails.append(details)
@@ -545,9 +610,16 @@ def runMutations(threadNum):
     if (globals.evalMutationFlag):
         details = eval.evalBatch(threadNum, mutationDetails)
 
+        finalData = finalData(details, finalData)
+
     # Save details
     if (globals.saveMutationFlag):
         saveMutation(mutationDetails)
+
+    
+    print()
+    parsed = json.loads(finalData)
+    print(json.dumps(parsed, indent=4, sort_keys=True))
 
 
 
