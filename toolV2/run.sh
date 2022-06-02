@@ -1,7 +1,7 @@
 
 
 
-python semFuzzLidar.py -path "/home/garrett/Documents/data/dataset/sequences/" -m "SCENE_NOISE" 
+python semFuzzLidar.py -path "/home/garrett/Documents/data/dataset/sequences/"
 
 # python semFuzzLidar.py -path "/Volumes/Extreme SSD/semKitti/dataset/sequences/" -ne
 

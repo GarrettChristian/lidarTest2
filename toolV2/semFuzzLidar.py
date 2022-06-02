@@ -578,14 +578,14 @@ def runMutations(threadNum):
     finalData = prepFinalDetails()
 
     # Until signaled to end
-    for _ in range (0, 1):
+    for _ in range (0, 10):
 
         mutationDetails = []
         bins = []
         labels = []
 
         # Mutate
-        for index in range(0, 10):
+        for index in range(0, 100):
             success, details, xyziFinal, labelFinal = performMutation()
             if success:
                 mutationDetails.append(details)
