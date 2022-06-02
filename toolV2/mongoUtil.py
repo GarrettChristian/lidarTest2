@@ -12,6 +12,7 @@ import json
 assetCollection = None
 assetMetadataCollection = None
 mutationCollection = None
+accuracyCollection = None
 
 
 
@@ -22,6 +23,7 @@ def mongoConnect():
     global assetCollection
     global assetMetadataCollection
     global mutationCollection
+    global accuracyCollection
 
     configFile = open("../mongoconnect.txt", "r")
     mongoUrl = configFile.readline()
@@ -34,6 +36,7 @@ def mongoConnect():
     assetCollection = db["assets2"]
     assetMetadataCollection = db["asset_metadata2"]
     mutationCollection = db["mutations"]
+    accuracyCollection = db["base_accuracy"]
 
 
 """
@@ -108,6 +111,22 @@ def getAssetById(id):
     asset = assetCollection.find_one({ "_id" : id })
 
     return getInstanceFromAssetRecord(asset.next())
+
+
+"""
+Gets an asset by the id
+"""
+def getBaseAccuracy(sequence, scene, model):
+
+    baseAcc = assetCollection.find_one({ "sequence" : sequence, "scene": scene, "model": model })
+
+    baseAccRecord = {}
+    try:
+        baseAccRecord = baseAcc.next()
+    except:
+        print("Get assetRecord failed")
+
+    return baseAccRecord
 
 
 

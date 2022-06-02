@@ -9,7 +9,10 @@ import sys
 from os.path import basename
 import shutil
 from operator import itemgetter
+import math
+
 import globals
+import mongoUtil
 
 name_label_mapping = {
     0: 'unlabeled',
@@ -206,7 +209,7 @@ def runSal():
 
 
 # https://github.com/PRBonn/semantic-kitti-api/blob/master/evaluate_semantics.py
-def evalLabels(label_file, pred_file, seq, model):
+def evalLabels(label_file, pred_file, model, details):
 
     print()
     print(label_file)
@@ -258,9 +261,8 @@ def evalLabels(label_file, pred_file, seq, model):
     results = {}
 
 
-    results["_id"] = model + "-" + seq + "-" + fileName
-    results["sequence"] = seq
-    results["scene"] = fileName
+    results["_id"] = model + "-" + fileName
+    results["file"] = fileName
     results["model"] = model
     results["jaccard"] = m_jaccard.item()
     results["accuracy"] = m_accuracy.item()
@@ -286,6 +288,18 @@ def evalLabels(label_file, pred_file, seq, model):
     sys.stdout.write('\n')
     sys.stdout.flush()
 
+
+    baseAccuracy = mongoUtil.getBaseAccuracy(details["baseSequence"], details["baseScene"], model)
+
+    jacChange = results["jaccard"] - baseAccuracy["jaccard"]
+    accChange = results["accuracy"] - baseAccuracy["accuracy"]
+    
+    results["jaccardChange"] = jacChange
+    results["accuracyChange"] = accChange
+
+    print("")
+    print(results["jaccardChange"])
+    print(results["accuracyChange"])
 
     return results
     
