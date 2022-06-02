@@ -9,6 +9,7 @@ import sys
 from os.path import basename
 import shutil
 from operator import itemgetter
+import globals
 
 name_label_mapping = {
     0: 'unlabeled',

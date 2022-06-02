@@ -1,7 +1,9 @@
 
 
 
-python semFuzzLidar.py -path "/Volumes/Extreme SSD/semKitti/dataset/sequences/" -ne
+python semFuzzLidar.py -path "/home/garrett/Documents/data/dataset/sequences/" 
+
+# python semFuzzLidar.py -path "/Volumes/Extreme SSD/semKitti/dataset/sequences/" -ne
 
 
 
