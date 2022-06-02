@@ -192,9 +192,9 @@ def runSal():
     # Data to run on
     runCommand += "-d " + globals.dataRoot
     # Results
-    runCommand += " -l " + globals.resultsDir + "/" + modelSal
+    runCommand += " -l " + globals.resultDir + "/" + modelSal
     # model
-    runCommand += " -m /home/garrett/Documents/SalsaNext/pretrained " 
+    runCommand += " -m /home/garrett/Documents/SalsaNext/pretrained "
     runCommand += "-s test -c 1"
     
     # Change To Model Dir

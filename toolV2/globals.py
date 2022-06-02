@@ -160,7 +160,7 @@ saveMutationFlag = True
 
 stageDir = ""
 dataRoot = ""
-resultsDir = ""
+resultDir = ""
 currentVelDir = ""
 doneVelDir = ""
 resultCylDir = ""
