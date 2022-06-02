@@ -1,3 +1,13 @@
+
+
+
+python semFuzzLidar.py -path "/Volumes/Extreme SSD/semKitti/dataset/sequences/" -ne
+
+
+
+
+
+
 # python semFuzzLidar.py -m SCENE -seq 0 -scene 000000 -vis -t REMOVE
 # python semFuzzLidar.py -m SCENE -seq 0 -scene 000000 -vis -t REMOVE -path "/Volumes/Extreme SSD/semKitti/dataset/sequences/"
 # python semFuzzLidar.py -m ADD -seq 0 -scene 000000 -vis -t ROTATE -path "/Volumes/Extreme SSD/semKitti/dataset/sequences/"
@@ -24,7 +34,7 @@
 
 # python semFuzzLidar.py -path "/Volumes/Extreme SSD/semKitti/dataset/sequences/" -vis  -seq 0 -scene 000000  -t "ADD_ROTATE" 
 
-python semFuzzLidar.py -path "/Volumes/Extreme SSD/semKitti/dataset/sequences/" -save "/Users/garrettchristian/DocumentsDesktop/uva21/summerProject/lidarTest2/dataset/sequences/00/"
+# python semFuzzLidar.py -path "/Volumes/Extreme SSD/semKitti/dataset/sequences/" -save "/Users/garrettchristian/DocumentsDesktop/uva21/summerProject/lidarTest2/dataset/sequences/00/"
 
 
 # ADD_ROTATE = "ADD_ROTATE",

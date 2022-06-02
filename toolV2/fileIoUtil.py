@@ -6,12 +6,11 @@ import numpy as np
 import globals
 
 
+
 """
-Saves a modified bin file and label file rejoining the intensity 
+Rejoins xyz & i bin file and label file semantics & instance
 """
-def saveToBin(xyz, intensity, semantics, labelsInstance, file):
-    binFile = globals.saveBinPath + file + ".bin"
-    labelFile = globals.saveLabelPath + file + ".label"
+def prepareToSave(xyz, intensity, semantics, labelsInstance):
 
     labelsCombined = (labelsInstance << 16) | (semantics & 0xFFFF)
 
@@ -21,8 +20,21 @@ def saveToBin(xyz, intensity, semantics, labelsInstance, file):
     xyziFlat = xyziFlat.astype(np.float32)
     labelsCombined = labelsCombined.astype(np.int32)
 
-    xyziFlat.tofile(binFile)
-    labelsCombined.tofile(labelFile)
+    return xyziFlat, labelsCombined
+
+
+"""
+Saves a modified bin file and label file rejoining the intensity 
+"""
+def saveToBin(xyzi, labels, saveBinPath, saveLabelPath, fileName):
+    binFile = saveBinPath + fileName + ".bin"
+    labelFile = saveLabelPath + fileName + ".label"
+
+    xyzi = xyzi.astype(np.float32)
+    labels = labels.astype(np.int32)
+
+    xyzi.tofile(binFile)
+    labels.tofile(labelFile)
 
 
 """

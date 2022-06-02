@@ -9,25 +9,22 @@ import argparse
 from enum import Enum
 import uuid
 import os
+import time
 
 
-from globals import Mutation
-from globals import Transformations
 import globals
 
 from mongoUtil import mongoConnect, saveMutation
 from mongoUtil import getRandomAssetOfType
 from mongoUtil import getRandomAssetWithinScene
-from fileIoUtil import openLabelBinFiles, saveToBin
 from open3dUtil import assetIntersectsWalls, pointsWithinDist, rotatePoints, pointsAboveGround, mirrorPoints, getValidRotations
 from open3dUtil import assetIsNotObsured
 from open3dUtil import removeLidarShadow
 import open3dUtil
+import fileIoUtil
+import eval
 
 # -------------------------------------------------------------
-
-saveNum = 0
-
 
 
 def scale(pcdArrAsset, details):
@@ -345,19 +342,14 @@ def rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, details):
 # ----------------------------------------------------------
 
 
-def evaluate():
-    print("TODO")
-
-
 def performMutation():
-    global saveNum
-
-    print(saveNum)
 
     # Create mutation details
     mutationId = str(uuid.uuid4())
     details = {}
     details["_id"] = mutationId
+    details["time"] = int(time.time())
+    details["dateTime"] = time.ctime(time.time())
 
     # Select Seed
     idx = random.choice(range(len(globals.labelFiles)))
@@ -374,11 +366,11 @@ def performMutation():
 
     # Select Mutation
     # mutation = random.choice(globals.mutationsEnabled)
-    transformation = random.choice(globals.tranformationsEnabled)
-    print(transformation)
+    mutation = random.choice(globals.mutationsEnabled)
+    print(mutation)
 
     # Base:
-    pcdArr, intensity, semantics, labelInstance = openLabelBinFiles(globals.binFiles[idx], globals.labelFiles[idx])
+    pcdArr, intensity, semantics, labelInstance = fileIoUtil.openLabelBinFiles(globals.binFiles[idx], globals.labelFiles[idx])
     pcdArrAsset = None
     intensityAsset = None
     semanticsAsset = None
@@ -388,10 +380,10 @@ def performMutation():
     success = True
     combine = True
 
-    tranformationSplitString = str(transformation).replace("Transformations.", "")
-    details["mutation"] = tranformationSplitString
-    tranformationSplit = tranformationSplitString.split('_')
-    assetLocation = tranformationSplit[0]
+    mutationSplitString = str(mutation).replace("Mutation.", "")
+    details["mutation"] = mutationSplitString
+    mutationSplit = mutationSplitString.split('_')
+    assetLocation = mutationSplit[0]
 
     # Get the asset
     if (assetLocation == "ADD"):
@@ -438,29 +430,29 @@ def performMutation():
 
 
     if success:
-        for transformIndex in range (1, len(tranformationSplit)):
+        for mutationIndex in range (1, len(mutationSplit)):
         # if (Transformations.INTENSITY == transformation):
-            if (tranformationSplit[transformIndex] == "INTENSITY"):
+            if (mutationSplit[mutationIndex] == "INTENSITY"):
                 intensityAsset, details = intensityChange(intensityAsset, assetRecord["typeNum"], details)
                 
-            elif (tranformationSplit[transformIndex] == "NOISE"):
+            elif (mutationSplit[mutationIndex] == "NOISE"):
                 pcdArrAsset, details = noise(pcdArrAsset, details)  
             
-            elif (tranformationSplit[transformIndex] == "SCALE"):
+            elif (mutationSplit[mutationIndex] == "SCALE"):
                 pcdArrAsset, details = scale(pcdArrAsset, details)       
 
-            elif (tranformationSplit[transformIndex] == "REMOVE"):
+            elif (mutationSplit[mutationIndex] == "REMOVE"):
                 pcdArr, intensity, semantics, labelInstance = open3dUtil.replaceBasedOnShadow(pcdArrAsset, pcdArr, intensity, semantics, labelInstance)
-                if transformIndex + 1 == len(tranformationSplit):
+                if mutationIndex + 1 == len(mutationSplit):
                     combine = False
 
-            elif (tranformationSplit[transformIndex] == "DENSIFY"):
+            elif (mutationSplit[mutationIndex] == "DENSIFY"):
                 pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, details = densify(pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, details)
 
-            elif (tranformationSplit[transformIndex] == "SPARSIFY"):
+            elif (mutationSplit[mutationIndex] == "SPARSIFY"):
                 pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, details = sparsify(pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, details)
 
-            elif (tranformationSplit[transformIndex] == "MIRROR"):
+            elif (mutationSplit[mutationIndex] == "MIRROR"):
                 axis = globals.mirrorAxis
                 if (not axis):
                     axis = random.randint(0, 1)
@@ -468,17 +460,17 @@ def performMutation():
                 details["mirror"] = 1
                 pcdArrAsset = mirrorPoints(pcdArrAsset, axis)
 
-            elif (tranformationSplit[transformIndex] == "TRANSLATE"):
-                if transformIndex + 1 == len(tranformationSplit):
+            elif (mutationSplit[mutationIndex] == "TRANSLATE"):
+                if mutationIndex + 1 == len(mutationSplit):
                     success, pcdArrAsset, pcdArr, intensity, semantics, labelInstance, details = translateFinal(pcdArrAsset, pcdArr, intensity, semantics, labelInstance, details)
                 else:
                     pcdArrAsset, details = translateV2(pcdArrAsset, pcdArr, intensity, semantics, labelInstance, details)
 
-            elif (tranformationSplit[transformIndex] == "ROTATE"):
+            elif (mutationSplit[mutationIndex] == "ROTATE"):
                 success, pcdArrAsset, pcdArr, intensity, semantics, labelInstance, details = rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, details)
 
             else:
-                print("NOT SUPPORTED {}".format(tranformationSplit[transformIndex]))
+                print("NOT SUPPORTED {}".format(mutationSplit[mutationIndex]))
 
 
     if success and combine:
@@ -508,11 +500,55 @@ def performMutation():
         o3d.visualization.draw_geometries([hull_ls, pcdScene])
 
 
+    xyziFinal = None
+    labelFinal = None
+
+
     if (success):
-        saveMutation(details)
-        saveToBin(pcdArr, intensity, semantics, labelInstance, mutationId)
-        saveNum += 1
+        xyziFinal, labelFinal = fileIoUtil.prepareToSave(pcdArr, intensity, semantics, labelInstance)
+
     
+    return success, details, xyziFinal, labelFinal
+    
+
+def runMutations(threadNum):
+    
+    # Until signaled to end
+    # while()
+
+    mutationDetails = []
+    bins = []
+    labels = []
+
+    # Mutate
+    for index in range(0, 5):
+        success, details, xyziFinal, labelFinal = performMutation()
+        if success:
+            mutationDetails.append(details)
+            bins.append(xyziFinal)
+            labels.append(labelFinal)
+
+    # Save
+    if (globals.saveMutationFlag):
+        # Save folders
+        saveVel = globals.stageDir + "/velodyne" + str(threadNum) + "/"
+        saveLabel = globals.stageDir + "/labels" + str(threadNum) + "/"
+
+        # Save bin and labels
+        for index in range(0, len(mutationDetails)):
+            fileIoUtil.saveToBin(bins[index], labels[index], saveVel, saveLabel, mutationDetails[index]["_id"])
+
+        # Save mutation details
+    
+    # Evaluate
+    if (globals.evalMutationFlag):
+        details = eval.evalBatch(threadNum, mutationDetails)
+
+    # Save details
+    if (globals.saveMutationFlag):
+        saveMutation(mutationDetails)
+
+
 
 # -------------------------------------------------------------
 
@@ -532,17 +568,28 @@ def parse_args():
         help="Path to the sequences", 
         nargs='?', const="/home/garrett/Documents/data/dataset/sequences/", 
         default="/home/garrett/Documents/data/dataset/sequences/")
-    p.add_argument("-save", 
-        help="Where to save the sequences", 
-        nargs='?', const="/home/garrett/Documents/data/dataset/sequences/", 
-        default="/home/garrett/Documents/data/dataset/sequences/")
+    # p.add_argument("-save", 
+    #     help="Where to save the sequences", 
+    #     nargs='?', const="/home/garrett/Documents/data/dataset/sequences/", 
+    #     default="/home/garrett/Documents/data/dataset/sequences/")
+    # p.add_argument('-m', required=False,
+    #     help='Mutations to perform comma seperated example: ADD,REMOVE')
+
     p.add_argument('-m', required=False,
-        help='Mutations to perform comma seperated example: ADD,REMOVE')
-    p.add_argument('-t', required=False,
         help='Transformations to perform comma seperated example: ROTATE,ROTATE_MIRROR')
+
+    p.add_argument("-t", 
+        help="Thread number default to 1", 
+        nargs='?', const=1, default=1)
 
     p.add_argument('-vis', help='Visualize with Open3D',
         action='store_true', default=False)
+
+    p.add_argument('-ne', help='Disables Evaluation',
+        action='store_false', default=True)
+    p.add_argument('-ns', help='Disables Saving',
+        action='store_false', default=True)
+    
     
     p.add_argument('-rotate', help='Value to rotate', required=False)
     p.add_argument('-mirror', help='Value to mirror', required=False)
@@ -577,10 +624,7 @@ def main():
     num = 0
 
     try:
-        for x in range(0, 30):
-            performMutation()        
-
-        evaluate()
+        runMutations(0)
 
     except KeyboardInterrupt:
         print("\n--------------------------------------------------------")

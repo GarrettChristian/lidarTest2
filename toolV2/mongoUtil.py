@@ -116,8 +116,7 @@ Save mutation data
 """
 def saveMutation(mutationData):
     print("Save Mutation Record")
-    print(json.dumps(mutationData, indent=4))
-    mutationCollection.insert_one(mutationData)
+    mutationCollection.insert_many(mutationData)
 
 
 
