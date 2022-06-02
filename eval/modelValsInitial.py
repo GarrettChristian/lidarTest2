@@ -278,7 +278,7 @@ def main():
         predFilesCyl = sorted(predFilesCyl)    
         predFilesSal = sorted(predFilesSal)    
         predFilesSpv = sorted(predFilesSpv)        
-        for index in range:
+        for index in range(0, len(labelFiles)):
 
             cyl = defEvalV1(labelFiles[index], predFilesCyl[index], folderNum, "cyl")
             sal = defEvalV1(labelFiles[index], predFilesSal[index], folderNum, "sal")
