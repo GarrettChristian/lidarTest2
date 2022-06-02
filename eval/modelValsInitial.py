@@ -1,10 +1,13 @@
 
 
-
-import argparse
+from pymongo import MongoClient
+import glob, os
 import numpy as np
+import open3d as o3d
 from np_ioueval import iouEval
 import sys
+from os.path import basename
+
 
 name_label_mapping = {
     0: 'unlabeled',
@@ -42,18 +45,6 @@ name_label_mapping = {
     # 258: 'moving-truck',
     # 259: 'moving-other-vehicle'
 }
-
-map_moving = {
-    252: 10, # 'moving-car',
-    253: 31, # 'moving-bicyclist',
-    254: 30, # 'moving-person',
-    255: 32, # 'moving-motorcyclist',
-    256: 16, # 'moving-on-rails',
-    257: 13, # 'moving-bus',
-    258: 18, # 'moving-truck',
-    259: 20  # 'moving-other-vehicle'
-}
-
 
 # https://github.com/PRBonn/semantic-kitti-api/blob/master/config/semantic-kitti.yaml
 learning_map = {
@@ -140,115 +131,21 @@ learning_ignore = { # Ignore classes
 }
 
 
-
-# def parse_args():
-#     p = argparse.ArgumentParser(
-#         description='Model Runner')
-#     p.add_argument(
-#         'label', help='actual labels')
-#     p.add_argument(
-#         'labelTest', help='labels to test against')
-
-#     return p.parse_args()
-
-
-def V1():
-
-    print("\n\n------------------------------")
-    print("\n\nStarting Model Eval\n\n")
-
-    # args = parse_args()
-    labelActual = "/Users/garrettchristian/DocumentsDesktop/uva21/summerProject/lidarTest2/test.label"
-    labelModel = "/Users/garrettchristian/DocumentsDesktop/uva21/summerProject/lidarTest2/000000.label"
-
-    labelArrActual = np.fromfile(labelActual, dtype=np.int32)
-    semantics = labelArrActual & 0xFFFF
-
-    labelArrModel = np.fromfile(labelModel, dtype=np.int32)
-    semanticsModel = labelArrModel & 0xFFFF
-    
-    classes = name_label_mapping.keys()
-
-    print(semantics)
-    print(labelArrModel)
-
-    print(np.shape(semantics))
-    print(np.shape(semanticsModel))
-
-    uniqueActual = set()
-    for lbl in semantics:
-        uniqueActual.add(lbl)
-
-    unique = set()
-    for lbl in semanticsModel:
-        if (lbl not in uniqueActual):
-            unique.add(lbl)
-
-    print(uniqueActual)
-    print(unique)
-    for un in unique:
-        if un in name_label_mapping.keys():
-            print(name_label_mapping[un])
-        else:
-            print("not found", un)
-
-
-
-    for label in semantics:
-        if label in map_moving.keys():
-            label = map_moving[label]
-
-
-    uniqueActual = set()
-    for lbl in semantics:
-        uniqueActual.add(lbl)
-    print(uniqueActual)
-
-    
-
-    jaSum = 0
-    for classNum in classes:
-
-        actualClass = semantics == classNum
-        modelPredClass = semanticsModel == classNum
-
-        tpMask = actualClass & modelPredClass
-        tp = np.sum(tpMask)
-        
-        fpMask = np.logical_not(actualClass) & modelPredClass
-        fp = np.sum(fpMask)
-
-        fnMask = actualClass & np.logical_not(modelPredClass)
-        fn = np.sum(fnMask)
-        
-        if ((tp + fp + fn) > 0):
-            jaSum += tp / (tp + fp + fn)
-        else:
-            jaSum += 1
-
-        print(name_label_mapping[classNum])
-        print(classNum)
-        print("Actual", np.sum(actualClass))
-        print("Model ", np.sum(modelPredClass))
-        print("tp", tp)
-        print("fp", fp)
-        print("fn", fn)
-        print(jaSum)
-        print()
-
-
-    result = jaSum / len(classes)
-    print(result)
-
-
-
 # https://github.com/PRBonn/semantic-kitti-api/blob/master/evaluate_semantics.py
-def main():
+def defEvalV1(label_file, pred_file, seq, model):
+
+    print()
+    print(label_file)
+    print(pred_file)
 
     # label_file = "/Users/garrettchristian/DocumentsDesktop/uva21/summerProject/lidarTest2/eval/000000Act.label"
     # pred_file = "/Users/garrettchristian/DocumentsDesktop/uva21/summerProject/lidarTest2/eval/000000Cyl.label"
-    label_file = "/Users/garrettchristian/DocumentsDesktop/uva21/summerProject/lidarTest2/eval/bus.label"
-    pred_file = "/Users/garrettchristian/DocumentsDesktop/uva21/summerProject/lidarTest2/eval/busCy.label"
+    # label_file = "/Users/garrettchristian/DocumentsDesktop/uva21/summerProject/lidarTest2/eval/bus.label"
+    # pred_file = "/Users/garrettchristian/DocumentsDesktop/uva21/summerProject/lidarTest2/eval/busCy.label"
+
+
+    fileName = basename(label_file)
+    fileName = fileName.replace(".label", "")
 
     numClasses = len(learning_map_inv)
 
@@ -289,11 +186,23 @@ def main():
     m_accuracy = evaluator.getacc()
     m_jaccard, class_jaccard = evaluator.getIoU()
 
+    results = {}
+
+
+    results["_id"] = model + "-" + seq + "-" + fileName
+    results["sequence"] = seq
+    results["scene"] = fileName
+    results["model"] = model
+    results["jaccard"] = m_jaccard.item()
+    results["accuracy"] = m_accuracy.item()
+
     # print also classwise
     for i, jacc in enumerate(class_jaccard):
         if i not in ignore:
             print('IoU class {i:} [{class_str:}] = {jacc:.3f}'.format(
             i=i, class_str=name_label_mapping[learning_map_inv[i]], jacc=jacc))
+
+            results[name_label_mapping[learning_map_inv[i]]] = jacc
 
     # print for spreadsheet
     print("*" * 80)
@@ -309,9 +218,108 @@ def main():
     sys.stdout.flush()
 
 
+    return results
+    
+
+
+
+"""
+Connect to mongodb 
+"""
+def mongoConnect():
+    configFile = open("../mongoconnect.txt", "r")
+    mongoUrl = configFile.readline()
+    print("Connecting to: ", mongoUrl)
+    configFile.close()
+    
+    client = MongoClient(mongoUrl)
+    db = client["lidar_data"]
+    return db
+
+
+
+def main():
+
+    print("\n\n------------------------------")
+    print("\n\nStarting Model Evaluation Upload\n\n")
+
+    print("Connecting to Mongo")
+    mdb = mongoConnect()
+    mdbCol = mdb["base_accuracy"]
+    print("Connected")
+
+
+
+
+    # label_file = "/Users/garrettchristian/DocumentsDesktop/uva21/summerProject/lidarTest2/eval/bus.label"
+    # pred_file = "/Users/garrettchristian/DocumentsDesktop/uva21/summerProject/lidarTest2/eval/busCy.label"
+
+    labelBasePath = "/home/garrett/Documents/data/dataset/sequences/"
+    predBasePath = "/home/garrett/Documents/data/resultsBase/"
+    
+    for x in range(0, 11):
+
+        add = []
+
+        folderNum = str(x).rjust(2, '0')
+
+        labelPath = labelBasePath + folderNum + "/labels/"
+        predPathCyl = predBasePath + folderNum + "/cyl/"
+        predPathSal = predBasePath + folderNum + "/sal/"
+        predPathSpv = predBasePath + folderNum + "/spv/"
+
+        labelFiles = glob.glob(labelPath + "*.label")
+        predFilesCyl = glob.glob(predPathCyl + "*.label")
+        predFilesSal = glob.glob(predPathSal + "*.label")
+        predFilesSpv = glob.glob(predPathSpv + "*.label")
+        
+        # Order the update files cronologically
+        labelFiles = sorted(labelFiles)
+        predFilesCyl = sorted(predFilesCyl)    
+        predFilesSal = sorted(predFilesSal)    
+        predFilesSpv = sorted(predFilesSpv)        
+        for index in range:
+
+            cyl = defEvalV1(labelFiles[index], predFilesCyl[index], folderNum, "cyl")
+            sal = defEvalV1(labelFiles[index], predFilesSal[index], folderNum, "sal")
+            spv = defEvalV1(labelFiles[index], predFilesSpv[index], folderNum, "spv")
+
+            add.append(cyl)
+            add.append(sal)
+            add.append(spv)
+
+        mdbCol.insert_many(add)
+
 
 if __name__ == '__main__':
     main()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

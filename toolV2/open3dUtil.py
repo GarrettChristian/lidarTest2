@@ -833,21 +833,21 @@ def alignZdim(asset, scene, semantics):
     mask = largerBox.get_point_indices_within_bounding_box(o3d.utility.Vector3dVector(pcdArrGround))
     onlyByCar = pcdArrGround[mask]
 
-    groundMax = 0
+    groundAvg = 0
     if (np.shape(onlyByCar)[0] != 0):
-        groundMax = np.max(onlyByCar.T[2])
+        groundAvg = np.average(onlyByCar.T[2])
         print("ground")
     else:
-        groundMax = np.average(pcdArrGround.T[2])
-        print("avvg")
+        groundAvg = np.average(pcdArrGround.T[2])
+        print("avg")
 
     boxMinZ = round(boxMinZ, 2)
-    groundMax = round(groundMax, 2)
+    groundAvg = round(groundAvg, 2)
 
     print("curr min", boxMinZ)
-    print("ground min", groundMax)
+    print("ground min", groundAvg)
 
-    change = groundMax - boxMinZ
+    change = groundAvg - boxMinZ
 
     assetCopy[:, 2] = assetCopy[:, 2] + change
 

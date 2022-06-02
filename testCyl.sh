@@ -6,7 +6,7 @@ echo "testing Cyl"
 
 python modelRunner.py -model cyl
 
-cp /home/garrett/Documents/data/results/cyl/000000.label /home/garrett/Documents/data/tmp/dataset/sequences/00/labels
+cp /home/garrett/Documents/data/results/cyl/*.label /home/garrett/Documents/data/tmp/dataset/sequences/00/labels/
 
 echo "run visualizer"
 

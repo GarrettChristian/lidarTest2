@@ -6,10 +6,12 @@ import globals
 from fileIoUtil import openLabelBin
 import numpy as np
 import os
+import json
 
 
 assetCollection = None
 assetMetadataCollection = None
+mutationCollection = None
 
 
 
@@ -19,6 +21,7 @@ Connect to mongodb
 def mongoConnect():
     global assetCollection
     global assetMetadataCollection
+    global mutationCollection
 
     configFile = open("../mongoconnect.txt", "r")
     mongoUrl = configFile.readline()
@@ -30,7 +33,7 @@ def mongoConnect():
     
     assetCollection = db["assets2"]
     assetMetadataCollection = db["asset_metadata2"]
-
+    mutationCollection = db["mutations"]
 
 
 """
@@ -53,21 +56,6 @@ def getInstanceFromAssetRecord(assetRecord):
 
     return pcdArr, intensity, semantics, labelInstance, assetRecord
 
-
-"""
-Gets a random asset from a specific sequence scene of type
-"""
-def getRandomAssetScene(binFilePath):
-
-    head_tail = os.path.split(binFilePath)
-    scene = head_tail[1]
-    scene = scene.replace('.bin', '')
-  
-    head_tail = os.path.split(head_tail[0])
-    head_tail = os.path.split(head_tail[0])
-    sequence = head_tail[1]
-
-    return getRandomAssetWithinScene(sequence, scene)
 
 
 """
@@ -127,9 +115,9 @@ def getAssetById(id):
 Save mutation data
 """
 def saveMutation(mutationData):
-
-    print("Save Mutation Record (TODO)")
-
+    print("Save Mutation Record")
+    print(json.dumps(mutationData, indent=4))
+    mutationCollection.insert_one(mutationData)
 
 
 

@@ -253,16 +253,18 @@ def init(args):
 
     global vehicles
 
+    global saveLabelPath
+    global saveBinPath
+
     binFiles = []
     labelFiles = []
     mutationsEnabled = []
     tranformationsEnabled = []
     path = ""
     visualize = ""
-    
-    saveLabelPath = ""
-    saveBinPath = ""
-    saveMutationPath = ""
+
+    saveLabelPath = args.save + "/resultLabels/"
+    saveBinPath = args.save + "/velodyne/"
 
     mutationsEnabled = prepareMutations(args.m)
     tranformationsEnabled = prepareTransformations(args.t)

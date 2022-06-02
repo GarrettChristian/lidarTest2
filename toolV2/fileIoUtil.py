@@ -3,15 +3,15 @@
 
 import numpy as np
 
-
+import globals
 
 
 """
 Saves a modified bin file and label file rejoining the intensity 
 """
 def saveToBin(xyz, intensity, semantics, labelsInstance, file):
-    binFile = file + ".bin"
-    labelFile = file + ".label"
+    binFile = globals.saveBinPath + file + ".bin"
+    labelFile = globals.saveLabelPath + file + ".label"
 
     labelsCombined = (labelsInstance << 16) | (semantics & 0xFFFF)
 

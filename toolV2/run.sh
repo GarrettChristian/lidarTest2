@@ -22,7 +22,9 @@
 # python semFuzzLidar.py -path "/Volumes/Extreme SSD/semKitti/dataset/sequences/" -t "SCENE_NOISE" 
 
 
-python semFuzzLidar.py -path "/Volumes/Extreme SSD/semKitti/dataset/sequences/" -vis  -seq 0 -scene 000000  -t "ADD_ROTATE" 
+# python semFuzzLidar.py -path "/Volumes/Extreme SSD/semKitti/dataset/sequences/" -vis  -seq 0 -scene 000000  -t "ADD_ROTATE" 
+
+python semFuzzLidar.py -path "/Volumes/Extreme SSD/semKitti/dataset/sequences/" -save "/Users/garrettchristian/DocumentsDesktop/uva21/summerProject/lidarTest2/dataset/sequences/00/"
 
 
 # ADD_ROTATE = "ADD_ROTATE",

@@ -7,6 +7,8 @@ import math
 import random
 import argparse
 from enum import Enum
+import uuid
+import os
 
 
 from globals import Mutation
@@ -15,7 +17,7 @@ import globals
 
 from mongoUtil import mongoConnect, saveMutation
 from mongoUtil import getRandomAssetOfType
-from mongoUtil import getRandomAssetScene
+from mongoUtil import getRandomAssetWithinScene
 from fileIoUtil import openLabelBinFiles, saveToBin
 from open3dUtil import assetIntersectsWalls, pointsWithinDist, rotatePoints, pointsAboveGround, mirrorPoints, getValidRotations
 from open3dUtil import assetIsNotObsured
@@ -26,23 +28,31 @@ import open3dUtil
 
 saveNum = 0
 
-def scale(pcdArrAsset):
+
+
+def scale(pcdArrAsset, details):
 
     posX = random.randint(0, 1)
     percentScale = random.uniform(0.6, 0.9)
     if (posX == 1):
         percentScale = random.uniform(1.1, 1.4)
 
+    details["scale"] = percentScale
+
     print("scale {}".format(percentScale))
 
-    return open3dUtil.scale(pcdArrAsset, percentScale)
+    pcdScaled =  open3dUtil.scale(pcdArrAsset, percentScale)
+
+    return pcdScaled, details
 
 
-def densify(pcdArrAsset, intensity, semantics, labelInstance):
+def densify(pcdArrAsset, intensity, semantics, labelInstance, details):
 
     percentRemove = random.uniform(0.1, 0.4)
     amountToRemove = int(np.floor(np.shape(pcdArrAsset)[0] * percentRemove))
     print("densify {} {}".format(amountToRemove, percentRemove))
+
+    details["densify"] = percentRemove
 
     maskRemove = np.full(np.shape(pcdArrAsset)[0], False)
     maskRemove[:amountToRemove] = True
@@ -53,16 +63,21 @@ def densify(pcdArrAsset, intensity, semantics, labelInstance):
     semanticsSparse = semantics[maskRemove]
     labelInstanceSparse = labelInstance[maskRemove]
 
-    pcdArrAssetSparse = noise(pcdArrAssetSparse)
+    pcdArrAssetSparse, details = noise(pcdArrAssetSparse, details)
 
-    return open3dUtil.combine(pcdArrAsset, intensity, semantics, labelInstance, 
+    pcdArrDense, intensityDense, semanticsDense, labelInstanceDense = open3dUtil.combine(pcdArrAsset, intensity, semantics, labelInstance, 
                         pcdArrAssetSparse, intensitySparse, semanticsSparse, labelInstanceSparse)
 
 
-def sparsify(pcdArrAsset, intensity, semantics, labelInstance):
+    return pcdArrDense, intensityDense, semanticsDense, labelInstanceDense, details
+
+
+def sparsify(pcdArrAsset, intensity, semantics, labelInstance, details):
 
     percentRemove = random.uniform(0.1, 0.4)
     amountToRemove = int(np.floor(np.shape(pcdArrAsset)[0] * percentRemove))
+
+    details["sparcify"] = percentRemove
 
     print("sparsify {} {}".format(amountToRemove, percentRemove))
     maskRemove = np.full(np.shape(pcdArrAsset)[0], True)
@@ -74,32 +89,34 @@ def sparsify(pcdArrAsset, intensity, semantics, labelInstance):
     semanticsSparse = semantics[maskRemove]
     labelInstanceSparse = labelInstance[maskRemove]
 
-    return pcdArrAssetSparse, intensitySparse, semanticsSparse, labelInstanceSparse
+    return pcdArrAssetSparse, intensitySparse, semanticsSparse, labelInstanceSparse, details
 
 
-def noise(pcdArrAsset):
+def noise(pcdArrAsset, details):
 
     asset = np.copy(pcdArrAsset)
 
     mu, sigma = 0, 0.1 
     # creating a noise with the same dimension as the dataset (2,2) 
-    noise = np.random.normal(mu, sigma, np.shape(pcdArrAsset)) 
+    noise = np.random.normal(mu, sigma, np.shape(pcdArrAsset))
+
+    details["noise"] = sigma
 
     asset = asset + noise
 
-    return asset
+    return asset, details
 
 
 
-def translateFinal(pcdArrAsset, pcdArr, intensity, semantics, labelInstance):
+def translateFinal(pcdArrAsset, pcdArr, intensity, semantics, labelInstance, details):
 
     
-    success, pcdArrAssetTranslated = translateV2(pcdArrAsset, pcdArr, semantics)
+    success, pcdArrAssetTranslated, details = translateV2(pcdArrAsset, pcdArr, semantics, details)
 
     if success:
         pcdArr, intensity, semantics, labelInstance = removeLidarShadow(pcdArrAssetTranslated, pcdArr, intensity, semantics, labelInstance)
     
-    return success, pcdArrAssetTranslated, pcdArr, intensity, semantics, labelInstance
+    return success, pcdArrAssetTranslated, pcdArr, intensity, semantics, labelInstance, details
 
 
 # def translate(pcdArrAsset, pcdArr, semantics):
@@ -146,7 +163,7 @@ def translateFinal(pcdArrAsset, pcdArr, intensity, semantics, labelInstance):
 #     return success, pcdAssetTranslated
 
 
-def translateV2(pcdArrAsset, pcdArr, semantics):
+def translateV2(pcdArrAsset, pcdArr, semantics, details):
 
     success = False
     attempts = 0
@@ -157,8 +174,9 @@ def translateV2(pcdArrAsset, pcdArr, semantics):
         if (posX == 1):
             translateAmount = random.uniform(0.3, 2)
 
-        pcdAssetTranslated = open3dUtil.translatePointsFromCenter(pcdArrAsset, translateAmount)
+        details["translate"] = translateAmount
 
+        pcdAssetTranslated = open3dUtil.translatePointsFromCenter(pcdArrAsset, translateAmount)
 
         print("Translate", translateAmount)
 
@@ -201,11 +219,11 @@ def translateV2(pcdArrAsset, pcdArr, semantics):
         attempts += 1
 
 
-    return success, pcdAssetTranslated
+    return success, pcdAssetTranslated, details
 
 
 
-def intensityChange(intensityAsset, type):
+def intensityChange(intensityAsset, type, details):
 
     mask = np.ones(np.shape(intensityAsset), dtype=bool)
 
@@ -224,6 +242,7 @@ def intensityChange(intensityAsset, type):
     if average > .1:
         mod = random.uniform(-.1, -.3)
 
+    details["intensity"] = mod
     
     print("Intensity {}".format(mod))
     
@@ -234,10 +253,10 @@ def intensityChange(intensityAsset, type):
     print(intensityAsset)
     print(average)
 
-    return intensityAsset
+    return intensityAsset, details
 
 
-def rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset):
+def rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, details):
     attempts = 0
     success = False
     degrees = []
@@ -257,6 +276,8 @@ def rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset):
             elif rotateDeg > 360:
                 rotateDeg = 360
         print(rotateDeg)
+        details['rotate'] = rotateDeg
+
         pcdArrAssetNew = rotatePoints(pcdArrAsset, rotateDeg)
 
 
@@ -319,9 +340,13 @@ def rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset):
 
         attempts += 1
     
-    return success, pcdArrAsset, pcdArr, intensity, semantics, labelInstance
+    return success, pcdArrAsset, pcdArr, intensity, semantics, labelInstance, details
 
 # ----------------------------------------------------------
+
+
+def evaluate():
+    print("TODO")
 
 
 def performMutation():
@@ -329,16 +354,28 @@ def performMutation():
 
     print(saveNum)
 
+    # Create mutation details
+    mutationId = str(uuid.uuid4())
+    details = {}
+    details["_id"] = mutationId
+
     # Select Seed
     idx = random.choice(range(len(globals.labelFiles)))
     print(globals.binFiles[idx])
+    head_tail = os.path.split(globals.binFiles[idx])
+    scene = head_tail[1]
+    scene = scene.replace('.bin', '')
+  
+    head_tail = os.path.split(head_tail[0])
+    head_tail = os.path.split(head_tail[0])
+    sequence = head_tail[1]
+    details["baseSequence"] = sequence
+    details["baseScene"] = scene
 
     # Select Mutation
-    mutation = random.choice(globals.mutationsEnabled)
-
+    # mutation = random.choice(globals.mutationsEnabled)
     transformation = random.choice(globals.tranformationsEnabled)
-
-    print(mutation, transformation)
+    print(transformation)
 
     # Base:
     pcdArr, intensity, semantics, labelInstance = openLabelBinFiles(globals.binFiles[idx], globals.labelFiles[idx])
@@ -352,6 +389,7 @@ def performMutation():
     combine = True
 
     tranformationSplitString = str(transformation).replace("Transformations.", "")
+    details["mutation"] = tranformationSplitString
     tranformationSplit = tranformationSplitString.split('_')
     assetLocation = tranformationSplit[0]
 
@@ -359,18 +397,25 @@ def performMutation():
     if (assetLocation == "ADD"):
         instanceType = random.choice(list(globals.instances.keys()))
         pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, assetRecord = getRandomAssetOfType(instanceType)
-        print(assetRecord)
 
     elif (assetLocation == "SCENE"):
-        pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, assetRecord = getRandomAssetScene(globals.binFiles[idx])
-        pcdArr, intensity, semantics, labelInstance = open3dUtil.removeAssetScene(pcdArrAsset, pcdArr, intensity, semantics, labelInstance)
-        print(assetRecord)
+        pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, assetRecord = getRandomAssetWithinScene(sequence, scene)
+        if (assetRecord != None):
+            pcdArr, intensity, semantics, labelInstance = open3dUtil.removeAssetScene(pcdArrAsset, pcdArr, intensity, semantics, labelInstance)
         
     else:
         print("ERROR: {} NOT SUPPORTED".format(assetLocation))
         exit()
 
+    # Validate the asset was found
+    if assetRecord == None:
+        print("Invalid Asset / No asset found")
+        success = False
+    else:
+        print(assetRecord)
+        details["asset"] = assetRecord["_id"]
     
+
     # if globals.visualize:
 
     #     # Get asset box
@@ -392,46 +437,49 @@ def performMutation():
     #     o3d.visualization.draw_geometries([hull_ls, pcdScene])
 
 
-    for transformIndex in range (1, len(tranformationSplit)):
-    # if (Transformations.INTENSITY == transformation):
-        if (tranformationSplit[transformIndex] == "INTENSITY"):
-            intensityAsset = intensityChange(intensityAsset, assetRecord["typeNum"])
+    if success:
+        for transformIndex in range (1, len(tranformationSplit)):
+        # if (Transformations.INTENSITY == transformation):
+            if (tranformationSplit[transformIndex] == "INTENSITY"):
+                intensityAsset, details = intensityChange(intensityAsset, assetRecord["typeNum"], details)
+                
+            elif (tranformationSplit[transformIndex] == "NOISE"):
+                pcdArrAsset, details = noise(pcdArrAsset, details)  
             
-        elif (tranformationSplit[transformIndex] == "NOISE"):
-            pcdArrAsset = noise(pcdArrAsset)  
-        
-        elif (tranformationSplit[transformIndex] == "SCALE"):
-            pcdArrAsset = scale(pcdArrAsset)       
+            elif (tranformationSplit[transformIndex] == "SCALE"):
+                pcdArrAsset, details = scale(pcdArrAsset, details)       
 
-        elif (tranformationSplit[transformIndex] == "REMOVE"):
-            pcdArr, intensity, semantics, labelInstance = open3dUtil.replaceBasedOnShadow(pcdArrAsset, pcdArr, intensity, semantics, labelInstance)
-            if transformIndex + 1 == len(tranformationSplit):
-                combine = False
+            elif (tranformationSplit[transformIndex] == "REMOVE"):
+                pcdArr, intensity, semantics, labelInstance = open3dUtil.replaceBasedOnShadow(pcdArrAsset, pcdArr, intensity, semantics, labelInstance)
+                if transformIndex + 1 == len(tranformationSplit):
+                    combine = False
 
-        elif (tranformationSplit[transformIndex] == "DENSIFY"):
-            pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset = densify(pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset)
+            elif (tranformationSplit[transformIndex] == "DENSIFY"):
+                pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, details = densify(pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, details)
 
-        elif (tranformationSplit[transformIndex] == "SPARSIFY"):
-            pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset = sparsify(pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset)
+            elif (tranformationSplit[transformIndex] == "SPARSIFY"):
+                pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, details = sparsify(pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, details)
 
-        elif (tranformationSplit[transformIndex] == "MIRROR"):
-            axis = globals.mirrorAxis
-            if (not axis):
-                axis = random.randint(0, 1)
-            print("Mirror Axis: {}".format(axis))
-            pcdArrAsset = mirrorPoints(pcdArrAsset, axis)
+            elif (tranformationSplit[transformIndex] == "MIRROR"):
+                axis = globals.mirrorAxis
+                if (not axis):
+                    axis = random.randint(0, 1)
+                print("Mirror Axis: {}".format(axis))
+                details["mirror"] = 1
+                pcdArrAsset = mirrorPoints(pcdArrAsset, axis)
 
-        elif (tranformationSplit[transformIndex] == "TRANSLATE"):
-            if transformIndex + 1 == len(tranformationSplit):
-                success, pcdArrAsset, pcdArr, intensity, semantics, labelInstance = translateFinal(pcdArrAsset, pcdArr, intensity, semantics, labelInstance)
+            elif (tranformationSplit[transformIndex] == "TRANSLATE"):
+                if transformIndex + 1 == len(tranformationSplit):
+                    success, pcdArrAsset, pcdArr, intensity, semantics, labelInstance, details = translateFinal(pcdArrAsset, pcdArr, intensity, semantics, labelInstance, details)
+                else:
+                    pcdArrAsset, details = translateV2(pcdArrAsset, pcdArr, intensity, semantics, labelInstance, details)
+
+            elif (tranformationSplit[transformIndex] == "ROTATE"):
+                success, pcdArrAsset, pcdArr, intensity, semantics, labelInstance, details = rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, details)
+
             else:
-                pcdArrAsset = translateV2(pcdArrAsset, pcdArr, intensity, semantics, labelInstance)
+                print("NOT SUPPORTED {}".format(tranformationSplit[transformIndex]))
 
-        elif (tranformationSplit[transformIndex] == "ROTATE"):
-            success, pcdArrAsset, pcdArr, intensity, semantics, labelInstance = rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset)
-
-        else:
-            print("NOT SUPPORTED {}".format(tranformationSplit[transformIndex]))
 
     if success and combine:
         pcdArr, intensity, semantics, labelInstance = open3dUtil.combine(pcdArr, intensity, semantics, labelInstance, 
@@ -461,8 +509,8 @@ def performMutation():
 
 
     if (success):
-        saveMutation("tmp")
-        saveToBin(pcdArr, intensity, semantics, labelInstance, str(saveNum))
+        saveMutation(details)
+        saveToBin(pcdArr, intensity, semantics, labelInstance, mutationId)
         saveNum += 1
     
 
@@ -482,6 +530,10 @@ def parse_args():
         help="specific scenario number provide full ie 002732")
     p.add_argument("-path", 
         help="Path to the sequences", 
+        nargs='?', const="/home/garrett/Documents/data/dataset/sequences/", 
+        default="/home/garrett/Documents/data/dataset/sequences/")
+    p.add_argument("-save", 
+        help="Where to save the sequences", 
         nargs='?', const="/home/garrett/Documents/data/dataset/sequences/", 
         default="/home/garrett/Documents/data/dataset/sequences/")
     p.add_argument('-m', required=False,
@@ -525,8 +577,10 @@ def main():
     num = 0
 
     try:
-        for x in range(0, 5):
+        for x in range(0, 30):
             performMutation()        
+
+        evaluate()
 
     except KeyboardInterrupt:
         print("\n--------------------------------------------------------")
