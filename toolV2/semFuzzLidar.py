@@ -548,6 +548,7 @@ def finalDetails(details, finalData):
 
     models = ["cyl", "spv", "sal"]
 
+    
     for detail in details:
         # Add count for mutation
         finalData[detail["mutation"]] = finalData[detail["mutation"]] + 1
@@ -559,14 +560,14 @@ def finalDetails(details, finalData):
             if (len(finalData[model][detail["mutation"]]["five"]) < 5):
                 finalData[model][detail["mutation"]]["five"].append((detail["_id"], detail[model]["accuracyChange"]))
                 finalData[model][detail["mutation"]]["five"].sort(key = lambda x: x[1])
-                print("< 5")
+                print("< 5", model)
                 print(finalData[model][detail["mutation"]]["five"])
 
             # Do have five check against current highest
             else:
                 # new lower change to acc
-                if (finalData[model][detail["mutation"]]["five"][4] > detail[model]["accuracyChange"]):
-                    print("new low!")
+                if (finalData[model][detail["mutation"]]["five"][4][1] > detail[model]["accuracyChange"]):
+                    print("new low!", model)
                     finalData[model][detail["mutation"]]["five"].append((detail["_id"], detail[model]["accuracyChange"]))
                     print(finalData[model][detail["mutation"]]["five"])
                     finalData[model][detail["mutation"]]["five"].sort(key = lambda x: x[1])
