@@ -296,11 +296,14 @@ def evalBatch(threadNum, details):
 
     # Lock mutex
     print("Lock mutex TODO")
+    
 
     # move the bins to the velodyne folder to run the models on them
     print("move to vel folder")
-    stageVel = globals.stageDir + "/velodyne" + str(threadNum)
-    shutil.move(stageVel, globals.currentVelDir)
+    stageVel = globals.stageDir + "/velodyne" + str(threadNum) + "/"
+    allfiles = os.listdir(stageVel)
+    for f in allfiles:
+        shutil.move(stageVel + f, globals.currentVelDir + "/" +  + f)
 
     # run all models on bin files
     print("Run models")
@@ -310,17 +313,28 @@ def evalBatch(threadNum, details):
 
     # Move the model label files to the evaluation folder   
     print("Move to eval folder")
-    evalCylDir = globals.evalDir + "/label" + str(threadNum) + "/" + modelCyl
-    evalSpvDir = globals.evalDir + "/label" + str(threadNum) + "/" + modelSpv
-    evalSalDir = globals.evalDir + "/label" + str(threadNum) + "/" + modelSal
-    shutil.move(globals.resultCylDir, evalCylDir)
-    shutil.move(globals.resultSpvDir, evalSpvDir)
-    shutil.move(globals.resultSalDir + "/predictions", evalSalDir)
+    evalCylDir = globals.evalDir + "/label" + str(threadNum) + "/" + modelCyl + "/"
+    evalSpvDir = globals.evalDir + "/label" + str(threadNum) + "/" + modelSpv + "/"
+    evalSalDir = globals.evalDir + "/label" + str(threadNum) + "/" + modelSal + "/"
+
+    allfiles = os.listdir(globals.resultCylDir + "/")
+    for f in allfiles:
+        shutil.move(globals.resultCylDir + "/" + f, evalCylDir + f)
+
+    allfiles = os.listdir(globals.resultSpvDir + "/")
+    for f in allfiles:
+        shutil.move(globals.resultSpvDir + "/" + f, evalSpvDir + f)
+
+    allfiles = os.listdir(globals.resultSalDir + "/predictions/")
+    for f in allfiles:
+        shutil.move(globals.resultSalDir + "/predictions/" + f, evalSalDir + f)
        
 
     # Move bins to done from the model folder
     print("Move bins to done")
-    shutil.move(globals.currentVelDir, globals.doneVelDir)
+    allfiles = os.listdir(globals.currentVelDir + "/")
+    for f in allfiles:
+        shutil.move(globals.currentVelDir + "/" + f, globals.doneVelDir + "/" + f)
 
 
     # Unlock Mutex
@@ -354,10 +368,21 @@ def evalBatch(threadNum, details):
 
     # Move to done folder
     print("Move to done folder")    
-    shutil.move(stageLabel, globals.doneLabelActualDir)
-    shutil.move(evalCylDir, globals.doneLabelCylDir )
-    shutil.move(evalSpvDir, globals.doneLabelSpvDir)
-    shutil.move(evalSalDir, globals.doneLabelSalDir)
+    allfiles = os.listdir(stageLabel + "/")
+    for f in allfiles:
+        shutil.move(stageLabel + "/" + f, globals.doneLabelActualDir + "/" + f)
+
+    allfiles = os.listdir(evalCylDir + "/")
+    for f in allfiles:
+        shutil.move(evalCylDir + "/" + f, globals.doneLabelCylDir + "/" + f)
+
+    allfiles = os.listdir(evalSpvDir + "/")
+    for f in allfiles:
+        shutil.move(evalSpvDir + "/" + f, globals.doneLabelSpvDir + "/" + f)
+
+    allfiles = os.listdir(evalSalDir + "/")
+    for f in allfiles:
+        shutil.move(evalSalDir + "/" + f, globals.doneLabelSalDir + "/" + f)
 
 
     return details
