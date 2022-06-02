@@ -354,7 +354,7 @@ def evalBatch(threadNum, details):
     predFilesCyl = sorted(predFilesCyl)    
     predFilesSal = sorted(predFilesSal)    
     predFilesSpv = sorted(predFilesSpv)        
-    details = sorted(details, key=itemgetter('name')) 
+    details = sorted(details, key=itemgetter('_id')) 
     for index in range(0, len(labelFiles)):
 
         cylResults = evalLabels(labelFiles[index], predFilesCyl[index], "cyl")
