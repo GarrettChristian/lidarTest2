@@ -616,12 +616,11 @@ def runMutations(threadNum):
 
     
     print()
-    parsed = json.loads(finalData)
-    print(json.dumps(parsed, indent=4, sort_keys=True))
+    print(json.dumps(finalData, indent=4))
     print()
 
     with open('finalData.json', 'w') as outfile:
-        json.dump(parsed, outfile, indent=4, sort_keys=True)
+        json.dump(finalData, outfile, indent=4)
 
 
 

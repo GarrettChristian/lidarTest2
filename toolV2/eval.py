@@ -232,7 +232,7 @@ def evalLabels(label_file, pred_file, model, details):
         if ign:
             x_cl = int(cl)
             ignore.append(x_cl)
-            print("Ignoring xentropy class ", x_cl, " in IoU evaluation")
+            # print("Ignoring xentropy class ", x_cl, " in IoU evaluation")
 
     evaluator = iouEval(numClasses, ignore)
     evaluator.reset()
@@ -266,12 +266,12 @@ def evalLabels(label_file, pred_file, model, details):
     results["accuracy"] = m_accuracy.item()
 
     # print also classwise
-    # for i, jacc in enumerate(class_jaccard):
-    #     if i not in ignore:
+    for i, jacc in enumerate(class_jaccard):
+        if i not in ignore:
     #         print('IoU class {i:} [{class_str:}] = {jacc:.3f}'.format(
     #         i=i, class_str=name_label_mapping[learning_map_inv[i]], jacc=jacc))
 
-    #         results[name_label_mapping[learning_map_inv[i]]] = jacc
+            results[name_label_mapping[learning_map_inv[i]]] = jacc
 
     # # print for spreadsheet
     # print("*" * 80)
