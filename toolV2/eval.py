@@ -140,9 +140,7 @@ learning_ignore = { # Ignore classes
 pathToModels = "/home/garrett/Documents"
 
 modelCylinder3D = "Cylinder3D"
-
 modelSpvnas = "spvnas"
-
 modelSalsaNext = "SalsaNext"
 
 modelCyl = "cyl"
@@ -298,8 +296,8 @@ def evalLabels(label_file, pred_file, model, details):
     results["accuracyChange"] = accChange
 
     print("")
-    print(results["jaccardChange"])
-    print(results["accuracyChange"])
+    print("jaccardChange", results["jaccardChange"])
+    print("accuracyChange", results["accuracyChange"])
 
     return results
     
@@ -371,9 +369,9 @@ def evalBatch(threadNum, details):
     details = sorted(details, key=itemgetter('_id')) 
     for index in range(0, len(labelFiles)):
 
-        cylResults = evalLabels(labelFiles[index], predFilesCyl[index], "cyl")
-        salResults = evalLabels(labelFiles[index], predFilesSal[index], "sal")
-        spvResults = evalLabels(labelFiles[index], predFilesSpv[index], "spv")
+        cylResults = evalLabels(labelFiles[index], predFilesCyl[index], modelCyl, details[index])
+        salResults = evalLabels(labelFiles[index], predFilesSal[index], modelSal, details[index])
+        spvResults = evalLabels(labelFiles[index], predFilesSpv[index], modelSpv, details[index])
 
         details[index][modelCyl] = cylResults
         details[index][modelSal] = salResults
