@@ -110,7 +110,7 @@ def getAssetById(id):
 
     asset = assetCollection.find_one({ "_id" : id })
 
-    return getInstanceFromAssetRecord(asset.next())
+    return getInstanceFromAssetRecord(asset)
 
 
 """
@@ -118,17 +118,9 @@ Gets an asset by the id
 """
 def getBaseAccuracy(sequence, scene, model):
 
-    baseAcc = accuracyCollection.find_one({"sequence": "00", "scene": "000066", "model": "cyl"})
-    test = accuracyCollection.find_one({"_id": "cyl-00-000066"})
-    print(test)
+    baseAcc = accuracyCollection.find_one({"sequence": sequence, "scene": scene, "model": model})
 
-    baseAccRecord = {}
-    try:
-        baseAccRecord = baseAcc.next()
-    except:
-        print("Get base accuracy failed")
-
-    return baseAccRecord
+    return baseAcc
 
 
 
