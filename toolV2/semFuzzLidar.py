@@ -619,7 +619,7 @@ def runMutations(threadNum):
     print(json.dumps(finalData, indent=4))
     print()
 
-    with open('finalData.json', 'w') as outfile:
+    with open(globals.dataDir + '/finalData.json', 'w') as outfile:
         json.dump(finalData, outfile, indent=4)
 
 

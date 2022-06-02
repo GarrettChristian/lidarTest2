@@ -171,6 +171,7 @@ doneLabelActualDir = ""
 doneLabelCylDir = ""
 doneLabelSpvDir = ""
 doneLabelSalDir = ""
+dataDir = ""
 
 
 
@@ -273,6 +274,7 @@ def setUpDataFolders(threads):
     global doneLabelCylDir 
     global doneLabelSpvDir
     global doneLabelSalDir
+    global dataDir
 
     curDir = os.getcwd()
 
