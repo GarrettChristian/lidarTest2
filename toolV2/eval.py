@@ -209,9 +209,9 @@ def runSal():
 # https://github.com/PRBonn/semantic-kitti-api/blob/master/evaluate_semantics.py
 def evalLabels(label_file, pred_file, model, details):
 
-    print()
-    print(label_file)
-    print(pred_file)
+    # print()
+    # print(label_file)
+    # print(pred_file)
 
 
     fileName = basename(label_file)
@@ -266,30 +266,28 @@ def evalLabels(label_file, pred_file, model, details):
     results["accuracy"] = m_accuracy.item()
 
     # print also classwise
-    for i, jacc in enumerate(class_jaccard):
-        if i not in ignore:
-            print('IoU class {i:} [{class_str:}] = {jacc:.3f}'.format(
-            i=i, class_str=name_label_mapping[learning_map_inv[i]], jacc=jacc))
+    # for i, jacc in enumerate(class_jaccard):
+    #     if i not in ignore:
+    #         print('IoU class {i:} [{class_str:}] = {jacc:.3f}'.format(
+    #         i=i, class_str=name_label_mapping[learning_map_inv[i]], jacc=jacc))
 
-            results[name_label_mapping[learning_map_inv[i]]] = jacc
+    #         results[name_label_mapping[learning_map_inv[i]]] = jacc
 
-    # print for spreadsheet
-    print("*" * 80)
-    print("below can be copied straight for paper table")
-    for i, jacc in enumerate(class_jaccard):
-        if i not in ignore:
-            sys.stdout.write('{jacc:.3f}'.format(jacc=jacc.item()))
-            sys.stdout.write(",")
-    sys.stdout.write('{jacc:.3f}'.format(jacc=m_jaccard.item()))
-    sys.stdout.write(",")
-    sys.stdout.write('{acc:.3f}'.format(acc=m_accuracy.item()))
-    sys.stdout.write('\n')
-    sys.stdout.flush()
+    # # print for spreadsheet
+    # print("*" * 80)
+    # print("below can be copied straight for paper table")
+    # for i, jacc in enumerate(class_jaccard):
+    #     if i not in ignore:
+    #         sys.stdout.write('{jacc:.3f}'.format(jacc=jacc.item()))
+    #         sys.stdout.write(",")
+    # sys.stdout.write('{jacc:.3f}'.format(jacc=m_jaccard.item()))
+    # sys.stdout.write(",")
+    # sys.stdout.write('{acc:.3f}'.format(acc=m_accuracy.item()))
+    # sys.stdout.write('\n')
+    # sys.stdout.flush()
 
 
     baseAccuracy = mongoUtil.getBaseAccuracy(details["baseSequence"], details["baseScene"], model)
-    print(baseAccuracy)
-    print(details["baseSequence"], details["baseScene"], model)
 
     jacChange = results["jaccard"] - baseAccuracy["jaccard"]
     accChange = results["accuracy"] - baseAccuracy["accuracy"]
@@ -297,9 +295,9 @@ def evalLabels(label_file, pred_file, model, details):
     results["jaccardChange"] = jacChange
     results["accuracyChange"] = accChange
 
-    print("")
-    print("jaccardChange", results["jaccardChange"])
-    print("accuracyChange", results["accuracyChange"])
+    # print("")
+    # print("jaccardChange", results["jaccardChange"])
+    # print("accuracyChange", results["accuracyChange"])
 
     return results
     

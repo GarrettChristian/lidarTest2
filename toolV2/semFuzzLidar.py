@@ -560,20 +560,17 @@ def finalDetails(details, finalData):
             if (len(finalData[model][detail["mutation"]]["five"]) < 5):
                 finalData[model][detail["mutation"]]["five"].append((detail["_id"], detail[model]["accuracyChange"]))
                 finalData[model][detail["mutation"]]["five"].sort(key = lambda x: x[1])
-                print("< 5", model)
                 print(finalData[model][detail["mutation"]]["five"])
 
             # Do have five check against current highest
             else:
                 # new lower change to acc
                 if (finalData[model][detail["mutation"]]["five"][4][1] > detail[model]["accuracyChange"]):
-                    print("new low!", model)
                     finalData[model][detail["mutation"]]["five"].append((detail["_id"], detail[model]["accuracyChange"]))
-                    print(finalData[model][detail["mutation"]]["five"])
                     finalData[model][detail["mutation"]]["five"].sort(key = lambda x: x[1])
                     finalData[model][detail["mutation"]]["five"].pop()
-                    print(finalData[model][detail["mutation"]]["five"])
 
+    return finalData
 
 
 def runMutations(threadNum):
@@ -581,46 +578,51 @@ def runMutations(threadNum):
     finalData = prepFinalDetails()
 
     # Until signaled to end
-    # while()
+    for _ in range (0, 1):
 
-    mutationDetails = []
-    bins = []
-    labels = []
+        mutationDetails = []
+        bins = []
+        labels = []
 
-    # Mutate
-    for index in range(0, 10):
-        success, details, xyziFinal, labelFinal = performMutation()
-        if success:
-            mutationDetails.append(details)
-            bins.append(xyziFinal)
-            labels.append(labelFinal)
+        # Mutate
+        for index in range(0, 10):
+            success, details, xyziFinal, labelFinal = performMutation()
+            if success:
+                mutationDetails.append(details)
+                bins.append(xyziFinal)
+                labels.append(labelFinal)
 
-    # Save
-    if (globals.saveMutationFlag):
-        # Save folders
-        saveVel = globals.stageDir + "/velodyne" + str(threadNum) + "/"
-        saveLabel = globals.stageDir + "/labels" + str(threadNum) + "/"
+        # Save
+        if (globals.saveMutationFlag):
+            # Save folders
+            saveVel = globals.stageDir + "/velodyne" + str(threadNum) + "/"
+            saveLabel = globals.stageDir + "/labels" + str(threadNum) + "/"
 
-        # Save bin and labels
-        for index in range(0, len(mutationDetails)):
-            fileIoUtil.saveToBin(bins[index], labels[index], saveVel, saveLabel, mutationDetails[index]["_id"])
+            # Save bin and labels
+            for index in range(0, len(mutationDetails)):
+                fileIoUtil.saveToBin(bins[index], labels[index], saveVel, saveLabel, mutationDetails[index]["_id"])
 
-        # Save mutation details
-    
-    # Evaluate
-    if (globals.evalMutationFlag):
-        details = eval.evalBatch(threadNum, mutationDetails)
+            # Save mutation details
+        
+        # Evaluate
+        if (globals.evalMutationFlag):
+            details = eval.evalBatch(threadNum, mutationDetails)
 
-        finalData = finalDetails(details, finalData)
+            finalData = finalDetails(details, finalData)
 
-    # Save details
-    if (globals.saveMutationFlag):
-        saveMutation(mutationDetails)
+        # Save details
+        if (globals.saveMutationFlag):
+            saveMutation(mutationDetails)
 
     
     print()
     parsed = json.loads(finalData)
     print(json.dumps(parsed, indent=4, sort_keys=True))
+    print()
+
+    with open('finalData.json', 'w') as outfile:
+        json.dump(parsed, outfile, indent=4, sort_keys=True)
+
 
 
 
