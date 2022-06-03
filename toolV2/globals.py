@@ -172,7 +172,7 @@ doneLabelCylDir = ""
 doneLabelSpvDir = ""
 doneLabelSalDir = ""
 dataDir = ""
-
+doneLabelDir = ""
 
 
 batchId = str(uuid.uuid4())
@@ -270,6 +270,7 @@ def setUpDataFolders(threads):
     global resultSpvDir
     global resultSalDir
     global evalDir
+    global doneLabelDir
     global doneLabelActualDir
     global doneLabelCylDir 
     global doneLabelSpvDir

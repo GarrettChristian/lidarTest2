@@ -1,7 +1,23 @@
 
 
 
-python semFuzzLidar.py -path "/home/garrett/Documents/data/dataset/sequences/"
+
+python semFuzzLidar.py -path "/home/garrett/Documents/data/dataset/sequences/" -t SCENE_NOISE
+
+
+# ADD_ROTATE
+# ADD_MIRROR_ROTATE
+# ADD_SCALE_ROTATE
+# SCENE_INTENSITY
+# SCENE_REMOVE
+# SCENE_NOISE
+# SCENE_REMOVE_TRANSLATE
+# SCENE_REMOVE_ROTATE
+# SCENE_SPARSIFY
+# SCENE_DENSIFY
+
+
+# python semFuzzLidar.py -path "/home/garrett/Documents/data/dataset/sequences/"
 
 # python semFuzzLidar.py -path "/Volumes/Extreme SSD/semKitti/dataset/sequences/" -ne
 
@@ -38,6 +54,17 @@ python semFuzzLidar.py -path "/home/garrett/Documents/data/dataset/sequences/"
 
 # python semFuzzLidar.py -path "/Volumes/Extreme SSD/semKitti/dataset/sequences/" -save "/Users/garrettchristian/DocumentsDesktop/uva21/summerProject/lidarTest2/dataset/sequences/00/"
 
+
+# ADD_ROTATE
+# ADD_MIRROR_ROTATE
+# ADD_SCALE_ROTATE
+# SCENE_INTENSITY
+# SCENE_REMOVE
+# SCENE_NOISE
+# SCENE_REMOVE_TRANSLATE
+# SCENE_REMOVE_ROTATE
+# SCENE_SPARSIFY
+# SCENE_DENSIFY
 
 # ADD_ROTATE = "ADD_ROTATE",
 # ADD_MIRROR_ROTATE = "ADD_MIRROR_ROTATE",

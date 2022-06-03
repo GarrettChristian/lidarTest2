@@ -7,7 +7,7 @@ import math
 import random
 import argparse
 from enum import Enum
-import uuid
+import shortuuid
 import os
 import sys
 import time
@@ -30,6 +30,22 @@ import eval
 
 
 # -------------------------------------------------------------
+
+
+
+"""
+formatSecondsToHhmmss
+Helper to convert seconds to hours minutes and seconds
+@param seconds
+@return formatted string of hhmmss
+"""
+def formatSecondsToHhmmss(seconds):
+    hours = seconds / (60*60)
+    seconds %= (60*60)
+    minutes = seconds / 60
+    seconds %= 60
+    return "%02i:%02i:%02i" % (hours, minutes, seconds)
+
 
 
 def scale(pcdArrAsset, details):
@@ -349,13 +365,22 @@ def rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, details):
 
 def performMutation():
 
+    # Select Mutation
+    # mutation = random.choice(globals.mutationsEnabled)
+    mutation = random.choice(globals.mutationsEnabled)
+    mutationSplitString = str(mutation).replace("Mutation.", "")
+    
+    print(mutationSplitString)
+
     # Create mutation details
-    mutationId = str(uuid.uuid4())
+    mutationId = str(shortuuid.uuid())
     details = {}
-    details["_id"] = mutationId
+    details["_id"] = mutationId + "-" + mutationSplitString
+    details["mutationId"] = mutationId
     details["time"] = int(time.time())
     details["dateTime"] = time.ctime(time.time())
     details["batchId"] = globals.batchId
+    details["mutation"] = mutationSplitString
 
     # Select Seed
     idx = random.choice(range(len(globals.labelFiles)))
@@ -370,11 +395,6 @@ def performMutation():
     details["baseSequence"] = sequence
     details["baseScene"] = scene
 
-    # Select Mutation
-    # mutation = random.choice(globals.mutationsEnabled)
-    mutation = random.choice(globals.mutationsEnabled)
-    print(mutation)
-
     # Base:
     pcdArr, intensity, semantics, labelInstance = fileIoUtil.openLabelBinFiles(globals.binFiles[idx], globals.labelFiles[idx])
     pcdArrAsset = None
@@ -386,8 +406,6 @@ def performMutation():
     success = True
     combine = True
 
-    mutationSplitString = str(mutation).replace("Mutation.", "")
-    details["mutation"] = mutationSplitString
     mutationSplit = mutationSplitString.split('_')
     assetLocation = mutationSplit[0]
 
@@ -523,6 +541,8 @@ def performMutation():
 def prepFinalDetails():
     finalData = {}
 
+    finalData["batchId"] = globals.batchId
+
     models = ["cyl", "spv", "sal"]
 
     for model in models:
@@ -548,6 +568,8 @@ def finalDetails(details, finalData):
 
     models = ["cyl", "spv", "sal"]
 
+    potentialActualLabelsRemove = []
+    deleteFiles = []
     
     for detail in details:
         # Add count for mutation
@@ -560,15 +582,40 @@ def finalDetails(details, finalData):
             if (len(finalData[model][detail["mutation"]]["five"]) < 5):
                 finalData[model][detail["mutation"]]["five"].append((detail["_id"], detail[model]["accuracyChange"]))
                 finalData[model][detail["mutation"]]["five"].sort(key = lambda x: x[1])
-                print(finalData[model][detail["mutation"]]["five"])
 
             # Do have five check against current highest
             else:
+                idRemove = detail["_id"]
+                binRemove = globals.doneVelDir + "/" + idRemove + ".bin"
+                labelRemove = globals.doneLabelDir + "/" + model + "/" + idRemove + ".label"
+                    
                 # new lower change to acc
                 if (finalData[model][detail["mutation"]]["five"][4][1] > detail[model]["accuracyChange"]):
                     finalData[model][detail["mutation"]]["five"].append((detail["_id"], detail[model]["accuracyChange"]))
                     finalData[model][detail["mutation"]]["five"].sort(key = lambda x: x[1])
-                    finalData[model][detail["mutation"]]["five"].pop()
+                    idRemove = finalData[model][detail["mutation"]]["five"].pop()
+
+                    binRemove = globals.doneVelDir + "/" + idRemove + ".bin"
+                    labelRemove = globals.doneLabelDir + "/" + model + "/" + idRemove + ".label"
+
+
+                deleteFiles.append(binRemove)
+                deleteFiles.append(labelRemove)
+                potentialActualLabelsRemove.append(idRemove)
+                
+
+    actualInUse = set()
+    for model in models:
+        for detailRecord in finalData[model][detail["mutation"]]["five"]:
+            actualInUse.add(detailRecord[0])
+
+    for labelId in potentialActualLabelsRemove:
+        if labelId not in actualInUse:
+            labelRemove = globals.doneLabelActualDir + "/" + idRemove + ".label"
+            deleteFiles.append(labelRemove)
+
+    for file in deleteFiles:
+        os.remove(file)
 
     return finalData
 
@@ -578,14 +625,14 @@ def runMutations(threadNum):
     finalData = prepFinalDetails()
 
     # Until signaled to end
-    for _ in range (0, 10):
+    for _ in range (0, 1):
 
         mutationDetails = []
         bins = []
         labels = []
 
         # Mutate
-        for index in range(0, 100):
+        for index in range(0, 10):
             success, details, xyziFinal, labelFinal = performMutation()
             if success:
                 mutationDetails.append(details)
@@ -696,7 +743,9 @@ def main():
     # Mutate
     print("Starting Mutation")
 
-    num = 0
+
+    # Start timer
+    tic = time.perf_counter()
 
     try:
         runMutations(0)
@@ -706,6 +755,11 @@ def main():
         print("Ctrl+C pressed...")
         print("Concluding\n")
 
+
+    # End timer
+    toc = time.perf_counter()
+    timeSeconds = toc - tic
+    timeFormatted = formatSecondsToHhmmss(timeSeconds)
 
 
 if __name__ == '__main__':
