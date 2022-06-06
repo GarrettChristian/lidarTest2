@@ -1,5 +1,4 @@
 
-from glob import glob
 import numpy as np
 from enum import Enum
 import glob, os

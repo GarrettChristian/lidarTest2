@@ -6,6 +6,9 @@ import os
 import yaml
 from laserscan import LaserScan, SemLaserScan
 from laserscanvis import LaserScanVis
+import glob
+import numpy as np
+
 
 import os
 
@@ -14,7 +17,7 @@ if __name__ == '__main__':
   parser.add_argument(
       '--dataset', '-d',
       type=str,
-      required=True,
+      required=False,
       help='Dataset to visualize. No Default',
   )
   parser.add_argument(
@@ -40,6 +43,22 @@ if __name__ == '__main__':
       'Must point to directory containing the predictions in the proper format '
       ' (see readme)'
       'Defaults to %(default)s',
+  )
+  parser.add_argument(
+      '--velodyne', '-v',
+      type=str,
+      default=None,
+      required=False,
+      help='Alternate location for bins, to use velodyne folder. '
+      'Must point to directory containing the bins in the proper format '
+      'Defaults to %(default)s',
+  )
+  parser.add_argument(
+      '--predictionSpecific', '-ps',
+      type=str,
+      default=None,
+      required=False,
+      help='Specific Scan'
   )
   parser.add_argument(
       '--ignore_semantics', '-i',
@@ -100,38 +119,46 @@ if __name__ == '__main__':
   # fix sequence name
   FLAGS.sequence = '{0:02d}'.format(int(FLAGS.sequence))
 
-  # does sequence folder exist?
-  scan_paths = os.path.join(FLAGS.dataset, "sequences",
-                            FLAGS.sequence, "velodyne")
-  if os.path.isdir(scan_paths):
-    print("Sequence folder exists! Using sequence from %s" % scan_paths)
-  else:
-    print("Sequence folder doesn't exist! Exiting...")
-    quit()
-
   # populate the pointclouds
-  scan_names = [os.path.join(dp, f) for dp, dn, fn in os.walk(
-      os.path.expanduser(scan_paths)) for f in fn]
+  scan_names = []
+  if FLAGS.velodyne is not None:
+    scan_names = np.array(glob.glob(FLAGS.velodyne + "/*.bin"))
+  else:
+    # does sequence folder exist?
+    scan_paths = os.path.join(FLAGS.dataset, "sequences",
+                              FLAGS.sequence, "velodyne")
+    if os.path.isdir(scan_paths):
+      print("Sequence folder exists! Using sequence from %s" % scan_paths)
+    else:
+      print("Sequence folder doesn't exist! Exiting...")
+      quit()
+
+    scan_names = [os.path.join(dp, f) for dp, dn, fn in os.walk(
+        os.path.expanduser(scan_paths)) for f in fn]
   scan_names.sort()
 
-  # does sequence folder exist?
+  # LABELS
+  label_names = []
   if not FLAGS.ignore_semantics:
-    if FLAGS.predictions is not None:
-      label_paths = os.path.join(FLAGS.predictions, "sequences",
-                                 FLAGS.sequence, "predictions")
+    if FLAGS.predictionSpecific is not None:
+      label_names = [FLAGS.predictionSpecific]
+    elif FLAGS.predictions is not None:
+      label_names = np.array(glob.glob(FLAGS.predictions + "/*.label"))
     else:
       label_paths = os.path.join(FLAGS.dataset, "sequences",
                                  FLAGS.sequence, "labels")
-    if os.path.isdir(label_paths):
-      print("Labels folder exists! Using labels from %s" % label_paths)
-    else:
-      print("Labels folder doesn't exist! Exiting...")
-      quit()
-    # populate the pointclouds
-    label_names = [os.path.join(dp, f) for dp, dn, fn in os.walk(
-        os.path.expanduser(label_paths)) for f in fn]
+      if os.path.isdir(label_paths):
+        print("Labels folder exists! Using labels from %s" % label_paths)
+      else:
+        print("Labels folder doesn't exist! Exiting...")
+        quit()
+      # populate the pointclouds
+      label_names = [os.path.join(dp, f) for dp, dn, fn in os.walk(
+          os.path.expanduser(label_paths)) for f in fn]
+    
     label_names.sort()
 
+    # Get label ids
     labelSet = set()
     for label in label_names:
       labelFileName = os.path.basename(label)
@@ -140,6 +167,7 @@ if __name__ == '__main__':
 
     print("Num scans: {} Num labels {}".format(len(scan_names), len(label_names)))
 
+    # Only use the point clouds that we have labels for
     revisedBins = []
     for scan in scan_names:
       binFileName = os.path.basename(scan)
@@ -171,12 +199,6 @@ if __name__ == '__main__':
                      label_names=label_names,
                      offset=FLAGS.offset,
                      semantics=semantics, instances=instances and semantics)
-
-  # print instructions
-  print("To navigate:")
-  print("\tb: back (previous scan)")
-  print("\tn: next (next scan)")
-  print("\tq: quit (exit program)")
 
   # run the visualizer
   vis.run()

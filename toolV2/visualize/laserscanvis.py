@@ -26,6 +26,12 @@ class LaserScanVis:
       print("Instances are only allowed in when semantics=True")
       raise ValueError
 
+      # print instructions
+    print("To navigate:")
+    print("\tb: back (previous scan)")
+    print("\tn: next (next scan)")
+    print("\tq: quit (exit program)")
+
     self.reset()
     self.update_scan()
 
@@ -140,6 +146,8 @@ class LaserScanVis:
     title = "scan " + str(self.offset) + "\t|\t[" + labelName + "]"
     self.canvas.title = title
     self.img_canvas.title = title
+
+    print("NOW SHOWING: {}".format(labelName))
 
     # then do all the point cloud stuff
 
