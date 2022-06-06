@@ -433,9 +433,12 @@ def setUpDataFolders(threads):
 
     # done
     doneDir = dataDir + "/done"
-    isExist = os.path.exists(doneDir)
-    if not isExist:
-        os.makedirs(doneDir)
+    if os.path.exists(doneDir):
+        shutil.rmtree(doneDir, ignore_errors=True)
+        print("Removing {}".format(doneDir))
+    # isExist = os.path.exists(doneDir)
+    # if not isExist:
+    #     os.makedirs(doneDir)
     
     # done
     doneVelDir = doneDir + "/velodyne"

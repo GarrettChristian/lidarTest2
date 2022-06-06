@@ -568,7 +568,7 @@ def finalDetails(details, finalData):
 
     models = ["cyl", "spv", "sal"]
 
-    potentialActualLabelsRemove = []
+    potentialRemove = set()
     deleteFiles = []
     
     for detail in details:
@@ -593,25 +593,24 @@ def finalDetails(details, finalData):
                 if (finalData[model][detail["mutation"]]["five"][4][1] > detail[model]["accuracyChange"]):
                     finalData[model][detail["mutation"]]["five"].append((detail["_id"], detail[model]["accuracyChange"]))
                     finalData[model][detail["mutation"]]["five"].sort(key = lambda x: x[1])
-                    idRemove = finalData[model][detail["mutation"]]["five"].pop()
-
-                    binRemove = globals.doneVelDir + "/" + idRemove + ".bin"
+                    idRemove = finalData[model][detail["mutation"]]["five"].pop()[0]
+                    
                     labelRemove = globals.doneLabelDir + "/" + model + "/" + idRemove + ".label"
 
-
-                deleteFiles.append(binRemove)
                 deleteFiles.append(labelRemove)
-                potentialActualLabelsRemove.append(idRemove)
+                potentialRemove.add(idRemove)
                 
 
-    actualInUse = set()
+    idInUse = set()
     for model in models:
         for detailRecord in finalData[model][detail["mutation"]]["five"]:
-            actualInUse.add(detailRecord[0])
+            idInUse.add(detailRecord[0])
 
-    for labelId in potentialActualLabelsRemove:
-        if labelId not in actualInUse:
+    for idRemove in potentialRemove:
+        if idRemove not in idInUse:
             labelRemove = globals.doneLabelActualDir + "/" + idRemove + ".label"
+            binRemove = globals.doneVelDir + "/" + idRemove + ".bin"
+            deleteFiles.append(binRemove)
             deleteFiles.append(labelRemove)
 
     for file in deleteFiles:

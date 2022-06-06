@@ -2,7 +2,7 @@
 
 
 
-python semFuzzLidar.py -path "/home/garrett/Documents/data/dataset/sequences/" -t SCENE_NOISE
+python semFuzzLidar.py -path "/home/garrett/Documents/data/dataset/sequences/" -m SCENE_NOISE
 
 
 # ADD_ROTATE
