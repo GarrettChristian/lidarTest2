@@ -6,6 +6,10 @@ from vispy.scene import visuals, SceneCanvas
 import numpy as np
 from matplotlib import pyplot as plt
 from laserscan import LaserScan, SemLaserScan
+import json
+
+from pymongo import MongoClient
+
 
 import os
 
@@ -13,7 +17,7 @@ class LaserScanVis:
   """Class that creates and handles a visualizer for a pointcloud"""
 
   def __init__(self, scan, scan_names, label_names, offset=0,
-               semantics=True, instances=False):
+               semantics=True, instances=False, mongo=False):
     self.scan = scan
     self.scan_names = scan_names
     self.label_names = label_names
@@ -21,10 +25,15 @@ class LaserScanVis:
     self.total = len(self.scan_names)
     self.semantics = semantics
     self.instances = instances
+    self.mongoLookup = mongo
+    self.mutationCollection = ""
     # sanity check
     if not self.semantics and self.instances:
       print("Instances are only allowed in when semantics=True")
       raise ValueError
+    
+    if mongo:
+      self.mongoConnect()
 
       # print instructions
     print("To navigate:")
@@ -34,6 +43,23 @@ class LaserScanVis:
 
     self.reset()
     self.update_scan()
+
+  
+  """
+  Connect to mongodb 
+  """
+  def mongoConnect(self):
+
+      configFile = open("../../mongoconnect.txt", "r")
+      mongoUrl = configFile.readline()
+      print("Connecting to: ", mongoUrl)
+      configFile.close()
+      
+      client = MongoClient(mongoUrl)
+      db = client["lidar_data"]
+      
+      self.mutationCollection = db["mutations"]
+
 
   def reset(self):
     """ Reset. """
@@ -147,7 +173,14 @@ class LaserScanVis:
     self.canvas.title = title
     self.img_canvas.title = title
 
-    print("NOW SHOWING: {}".format(labelName))
+    print("NOW SHOWING: {} {}".format(self.offset, labelName))
+
+    if self.mongoLookup:
+      item = self.mutationCollection.find_one({ "_id" : labelName })
+      item["cyl"] = item["cyl"]["accuracyChange"]
+      item["sal"] = item["sal"]["accuracyChange"]
+      item["spv"] = item["spv"]["accuracyChange"]
+      print(json.dumps(item, indent=4))
 
     # then do all the point cloud stuff
 

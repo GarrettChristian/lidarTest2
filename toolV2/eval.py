@@ -354,7 +354,7 @@ def evalBatch(threadNum, details):
 
 
     # Evaluate 
-    print("Eval TODO")
+    print("Eval")
     stageLabel = globals.stageDir + "/labels" + str(threadNum) + "/"
     labelFiles = glob.glob(stageLabel + "*.label")
     predFilesCyl = glob.glob(evalCylDir + "*.label")

@@ -430,6 +430,7 @@ def performMutation():
     else:
         print(assetRecord)
         details["asset"] = assetRecord["_id"]
+        details["assetType"] = assetRecord["type"]
     
 
     # if globals.visualize:
@@ -586,7 +587,6 @@ def finalDetails(details, finalData):
             # Do have five check against current highest
             else:
                 idRemove = detail["_id"]
-                binRemove = globals.doneVelDir + "/" + idRemove + ".bin"
                 labelRemove = globals.doneLabelDir + "/" + model + "/" + idRemove + ".label"
                     
                 # new lower change to acc
@@ -602,9 +602,11 @@ def finalDetails(details, finalData):
                 
 
     idInUse = set()
-    for model in models:
-        for detailRecord in finalData[model][detail["mutation"]]["five"]:
-            idInUse.add(detailRecord[0])
+    for mutation in globals.mutationsEnabled:
+        mutationString = str(mutation).replace("Mutation.", "")
+        for model in models:
+            for detailRecord in finalData[model][mutationString]["five"]:
+                idInUse.add(detailRecord[0])
 
     for idRemove in potentialRemove:
         if idRemove not in idInUse:
@@ -619,19 +621,23 @@ def finalDetails(details, finalData):
     return finalData
 
 
+
 def runMutations(threadNum):
     
     finalData = prepFinalDetails()
 
-    # Until signaled to end
-    for _ in range (0, 10):
+    # Until signaled to end TODO
+    for num in range (0, 10):
 
         mutationDetails = []
         bins = []
         labels = []
 
         # Mutate
-        for index in range(0, 100):
+        batchNum = 100
+        for index in range(0, batchNum):
+            print("\n\n{}".format((num * batchNum) + index))
+
             success, details, xyziFinal, labelFinal = performMutation()
             if success:
                 mutationDetails.append(details)
@@ -660,7 +666,7 @@ def runMutations(threadNum):
         if (globals.saveMutationFlag):
             saveMutation(mutationDetails)
 
-    
+
     print()
     print(json.dumps(finalData, indent=4))
     print()

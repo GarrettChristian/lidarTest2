@@ -61,6 +61,13 @@ if __name__ == '__main__':
       help='Specific Scan'
   )
   parser.add_argument(
+      '--show_mongo', '-m',
+      dest='show_mongo',
+      default=False,
+      action='store_true',
+      help='Print mongo info for the mutation',
+  )
+  parser.add_argument(
       '--ignore_semantics', '-i',
       dest='ignore_semantics',
       default=False,
@@ -198,7 +205,8 @@ if __name__ == '__main__':
                      scan_names=scan_names,
                      label_names=label_names,
                      offset=FLAGS.offset,
-                     semantics=semantics, instances=instances and semantics)
+                     semantics=semantics, instances=instances and semantics,
+                     mongo=FLAGS.show_mongo)
 
   # run the visualizer
   vis.run()
