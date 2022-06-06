@@ -140,5 +140,6 @@ mongoconnect.txt
 *.bin
 *.label
 
+*.json
 
 
