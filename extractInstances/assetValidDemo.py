@@ -127,7 +127,7 @@ def assetIsValid(asset, sceneWithoutInstance):
     if (incuded):
         hull_ls.paint_uniform_color((1, 0.2, 0.2))
     else:
-        hull_ls.paint_uniform_color((0.2, 1, 0.2))
+        hull_ls.paint_uniform_color((0.2, 0.2, 1))
 
     return hull_ls, not incuded
 
