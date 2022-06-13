@@ -101,7 +101,7 @@ def deform(asset, details):
     return asset, details
 
 
-def scale(pcdArrAsset, details):
+def scaleV1(pcdArrAsset, details):
 
     posX = random.randint(0, 1)
     percentScale = random.uniform(0.6, 0.9)
@@ -351,7 +351,6 @@ def rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, details):
 
         pcdArrAssetNew = rotatePoints(pcdArrAsset, rotateDeg)
 
-
         # # Get asset box
         # pcdAsset = o3d.geometry.PointCloud()
         # pcdAsset.points = o3d.utility.Vector3dVector(pcdArrAssetNew)
@@ -490,7 +489,15 @@ def performMutation():
         
         if (assetRecord != None):
             pcdArr, intensity, semantics, labelInstance = pcdUtil.removeAssetScene(pcdArrAsset, pcdArr, intensity, semantics, labelInstance)
-        
+    
+    elif (assetLocation == "SIGN"):
+        success, pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset = pcdUtil.getSignAsset(pcdArr, intensity, semantics, labelInstance)
+        assetRecord = {}
+        assetRecord["_id"] = "sign"
+        assetRecord["type"] = "sign"
+        if (success):
+            pcdArr, intensity, semantics, labelInstance = pcdUtil.removeAssetScene(pcdArrAsset, pcdArr, intensity, semantics, labelInstance)
+
     else:
         print("ERROR: {} NOT SUPPORTED".format(assetLocation))
         exit()
@@ -539,10 +546,11 @@ def performMutation():
                 pcdArrAsset, details = noise(pcdArrAsset, details)  
             
             elif (mutationSplit[mutationIndex] == "SCALE"):
-                pcdArrAsset, details = scale(pcdArrAsset, details)       
+                success, pcdArr, intensity, semantics, labelInstance, pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, details = pcdUtil.scaleVehicle(pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, 
+                                                                                                                                                            pcdArr, intensity, semantics, labelInstance, details) 
 
             elif (mutationSplit[mutationIndex] == "REMOVE"):
-                pcdArr, intensity, semantics, labelInstance = pcdUtil.replaceBasedOnShadow(pcdArrAsset, pcdArr, intensity, semantics, labelInstance)
+                success, pcdArr, intensity, semantics, labelInstance = pcdUtil.replaceBasedOnShadow(pcdArrAsset, pcdArr, intensity, semantics, labelInstance)
                 if mutationIndex + 1 == len(mutationSplit):
                     combine = False
 
@@ -568,6 +576,10 @@ def performMutation():
 
             elif (mutationSplit[mutationIndex] == "ROTATE"):
                 success, pcdArrAsset, pcdArr, intensity, semantics, labelInstance, details = rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, details)
+
+            elif (mutationSplit[mutationIndex] == "REPLACE"):
+                success, pcdArr, intensity, semantics, labelInstance, pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, details = pcdUtil.signReplace(pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, 
+                                                                                                                                                            pcdArr, intensity, semantics, labelInstance, details)
 
             else:
                 print("NOT SUPPORTED {}".format(mutationSplit[mutationIndex]))
@@ -595,7 +607,7 @@ def performMutation():
         # Color as intensity
         colors = np.zeros(np.shape(pcdArr), dtype=np.float64)
         if ("INTENSITY" in mutationSet):
-            colors[:, 0] = intensity
+            colors[:, 2] = intensity
         else:
             for semIdx in range(0, len(semantics)):
                 colors[semIdx][0] = (globals.color_map_alt[semantics[semIdx]][0] / 255)
@@ -710,19 +722,30 @@ def runMutations(threadNum):
     
     finalData = prepFinalDetails()
 
+    errors = []
+
     # Until signaled to end TODO
-    for num in range (0, 5):
+    for num in range (0, 1):
 
         mutationDetails = []
         bins = []
         labels = []
 
         # Mutate
-        batchNum = 100
+        batchNum = 1
         for index in range(0, batchNum):
             print("\n\n{}".format((num * batchNum) + index))
 
+            success = False
             success, details, xyziFinal, labelFinal = performMutation()
+            # try:
+            #     success, details, xyziFinal, labelFinal = performMutation()
+            # except Exception as e:
+            #     print("\n\n\n ERROR IN PERFORM MUTATION \n\n\n")
+            #     print(e)
+            #     print("\n\n")
+            #     errors.append(e)
+
             if success:
                 mutationDetails.append(details)
                 bins.append(xyziFinal)
@@ -755,9 +778,16 @@ def runMutations(threadNum):
     print(json.dumps(finalData, indent=4))
     print()
 
-    with open(globals.dataDir + '/finalData.json', 'w') as outfile:
-        json.dump(finalData, outfile, indent=4)
+    if (globals.saveMutationFlag):
+        with open(globals.dataDir + '/finalData.json', 'w') as outfile:
+            json.dump(finalData, outfile, indent=4)
 
+
+    for idx in range(0, len(errors)):
+        print("\n")
+        print("Error {}".format(idx))
+        print(errors[idx])
+        print("\n")
 
 
 
@@ -779,12 +809,11 @@ def parse_args():
         help="Path to the sequences", 
         nargs='?', const="/home/garrett/Documents/data/dataset/sequences/", 
         default="/home/garrett/Documents/data/dataset/sequences/")
-    # p.add_argument("-save", 
-    #     help="Where to save the sequences", 
-    #     nargs='?', const="/home/garrett/Documents/data/dataset/sequences/", 
-    #     default="/home/garrett/Documents/data/dataset/sequences/")
-    # p.add_argument('-m', required=False,
-    #     help='Mutations to perform comma seperated example: ADD,REMOVE')
+
+    p.add_argument("-save", 
+        help="Where to save the sequences", 
+        nargs='?', const="data", 
+        default="data")
 
     p.add_argument('-m', required=False,
         help='Transformations to perform comma seperated example: ROTATE,ROTATE_MIRROR')

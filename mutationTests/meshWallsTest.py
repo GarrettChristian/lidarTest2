@@ -268,14 +268,16 @@ def meshAsset(asset, scene, intensity, semantics, labelsInstance):
     print(pcdAsset.has_normals())
     pcdAsset.orient_normals_towards_camera_location()
 
-    mesh, _ = pcdAsset.compute_convex_hull()
+    # mesh, _ = pcdAsset.compute_convex_hull()
+    radii = [0.15, 0.15, 0.15, 0.15]
+    mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(pcdAsset, o3d.utility.DoubleVector(radii))
 
     mesh.scale(1.2, center=mesh.get_center())
 
 
     legacyMesh = o3d.t.geometry.TriangleMesh.from_legacy(mesh)
     sceneRays = o3d.t.geometry.RaycastingScene()
-    # sceneRays.add_triangles(legacyMesh)
+    sceneRays.add_triangles(legacyMesh)
 
     shadow = getLidarShadowMesh(np.array(mesh.vertices))
     sceneMask = checkInclusionBasedOnTriangleMesh(scene, shadow)
@@ -291,27 +293,45 @@ def meshAsset(asset, scene, intensity, semantics, labelsInstance):
 
     ans = sceneRays.cast_rays(rays)
 
-    # print(ans.keys())
+    print(ans.keys())
     # print(ans["t_hit"][0])
     # print(ans["primitive_ids"][0])
     # print(ans["primitive_uvs"][0])
 
-    for hit in ans["t_hit"]:
-        if (hit != math.inf):
-            print(hit)
+    # print(ans["t_hit"])
+
+    # for hit in ans["t_hit"]:
+    #     if (hit != math.inf):
+    #         print(hit.numpy())
+
+    hit = ans['t_hit'].isfinite()
+    pointsOnMesh = rays[hit][:,:3] + rays[hit][:,3:]*ans['t_hit'][hit].reshape((-1,1))
+    print(np.shape(pointsOnMesh))
+
+    # print(sceneRays.count_intersections(rays))
+
+    newPosition = []
+    for vector in pointsOnMesh:
+        # print(vector.numpy())
+        newPosition.append(vector.numpy())
+    # print(newPosition)
 
     pcdScene2 = o3d.geometry.PointCloud()
     pcdScene2.points = o3d.utility.Vector3dVector(sceneIncluded)
     pcdScene3 = o3d.geometry.PointCloud()
     pcdScene3.points = o3d.utility.Vector3dVector(sceneNotIncluded)
+    pcdScene4 = o3d.geometry.PointCloud()
+    pcdScene4.points = o3d.utility.Vector3dVector(pointsOnMesh.numpy())
     
     numPoints = np.sum(sceneMask)
+    
 
     # tmpPcd = mesh.sample_points_uniformly(number_of_points = numPoints)
 
     # o3d.visualization.draw_geometries([pcdAsset])
     # o3d.visualization.draw_geometries([pcdScene2, rec_mesh])
-    o3d.visualization.draw_geometries([pcdScene3, mesh])
+    o3d.visualization.draw_geometries([pcdScene3, mesh, pcdAsset])
+    o3d.visualization.draw_geometries([pcdScene3, pcdScene4, pcdAsset])
 
 
 def meshAssetUniformSample(asset, scene, intensity, semantics, labelsInstance):

@@ -6,6 +6,8 @@ import open3d as o3d
 import math
 from sklearn.neighbors import NearestNeighbors
 import sys
+import random
+import copy
 
 import globals
 
@@ -245,7 +247,7 @@ def assetIntersectsWalls(asset, scene, semantics):
 # -------------------------------------------------------------
 
 
-def scale(points, scale):
+def scaleV1(points, scale):
     pointsCopy = np.copy(points)
 
     pcdPoints = o3d.geometry.PointCloud()
@@ -594,6 +596,10 @@ def replaceBasedOnShadow(asset, scene, intensity, semantics, labelsInstance):
     maskAbove = checkInclusionBasedOnTriangleMesh(sceneWithoutGround, hullShadowRaised)
     print("Above: ", np.sum(maskAbove))
 
+    if (np.sum(maskAbove) > 30):
+        print("TOO MANY ABOVE")
+        return False, None, None, None, None,
+
     # Remove
 
     #  Get the asset's convex hull
@@ -692,6 +698,8 @@ def replaceBasedOnShadow(asset, scene, intensity, semantics, labelsInstance):
 
     angleLeft = getAngleRadians(centerCamPoint, left, midPoint)
     angleRight = getAngleRadians(centerCamPoint, midPoint, right)
+    angleLeft = angleLeft * (180 / math.pi)
+    angleRight = angleRight * (180 / math.pi)
     print(angleLeft)
     print(angleRight)
     if angleLeft < 0:
@@ -818,7 +826,7 @@ def replaceBasedOnShadow(asset, scene, intensity, semantics, labelsInstance):
 
 
 
-    return sceneReplace, intensityReplace, semanticsReplace, labelsInstanceReplace
+    return True, sceneReplace, intensityReplace, semanticsReplace, labelsInstanceReplace
 
 
 """
@@ -1300,10 +1308,10 @@ def getAngleRadians(p0, p1, p2):
     result = math.atan2(p2y - p0y, p2x - p0x) - math.atan2(p1y - p0y, p1x - p0x)
 
 
-    degreesResult = result * (180 / math.pi)
+    # degreesResult = result * (180 / math.pi)
 
-    # return result
-    return degreesResult
+    return result
+    # return degreesResult
 
     # a = np.asarray(p0x - p1x, p0y - p1y)
     # b = np.asarray(p1x - p2x, p0y - p2y)
@@ -1364,6 +1372,273 @@ def alignZdim(asset, scene, semantics):
     assetCopy[:, 2] = assetCopy[:, 2] + change
 
     return assetCopy
+
+
+
+
+
+# Get closest to the two bounding points selected
+def closestBoundingTwo(min, max, asset):
+
+    # Remove Z dim
+    assetCopy = np.copy(asset)
+    assetCopy[:, 2] = 0
+
+    # Find closest
+    pcdAssetNearest = o3d.geometry.PointCloud()
+    pcdAssetNearest.points = o3d.utility.Vector3dVector(assetCopy)
+    pcd_tree = o3d.geometry.KDTreeFlann(pcdAssetNearest)
+    [k, idx, _] = pcd_tree.search_knn_vector_3d(min, 1)
+    [k, idx2, _] = pcd_tree.search_knn_vector_3d(max, 1)
+
+    return asset[idx][0], asset[idx2][0]
+
+
+
+
+
+
+def createStopSign(center):
+    
+
+    box = o3d.geometry.TriangleMesh.create_box(width=0.05, height=0.75, depth=0.30)
+    box2 = o3d.geometry.TriangleMesh.create_box(width=0.05, height=0.30, depth=0.75)
+
+    box.translate(center, relative=False)
+    box2.translate(center, relative=False)
+
+    signVertices = np.vstack((np.array(box.vertices), np.array(box2.vertices)))
+
+    pcdSign = o3d.geometry.PointCloud()
+    pcdSign.points = o3d.utility.Vector3dVector(signVertices)
+
+    #  Get the asset's hull mesh
+    sign, _ = pcdSign.compute_convex_hull()
+
+    return sign
+
+
+
+def getSignAsset(scene, intensity, semantics, labelsInstance):
+    
+    maskSign = (semantics == 81)
+
+    onlySigns = scene[maskSign, :]
+    intensitySigns = intensity[maskSign]
+    semanticsSigns = semantics[maskSign]
+    labelsInstanceSigns = labelsInstance[maskSign]
+
+    # Check that there are signs 
+    if (np.shape(onlySigns)[0] < 1):
+        print("NO SIGNS FOUND")
+        return False, None, None, None, None
+
+    pcdSigns = o3d.geometry.PointCloud()
+    pcdSigns.points = o3d.utility.Vector3dVector(onlySigns)
+
+    labels = np.array(pcdSigns.cluster_dbscan(eps=2, min_points=10, print_progress=True))
+    max_label = labels.max()
+    print(f"point cloud has {max_label + 1} clusters")
+
+    if (max_label < 0):
+        print("NO SIGNS FOUND")
+        return False, None, None, None, None
+
+    signIndex = random.randint(0, max_label)
+    print(labels)
+    print(signIndex)
+
+    oneSign = onlySigns[labels == signIndex, :]
+    intensitySign = intensitySigns[labels == signIndex]
+    semanticsSign = semanticsSigns[labels == signIndex]
+    labelsInstanceSign= labelsInstanceSigns[labels == signIndex]
+
+    return True, oneSign, intensitySign, semanticsSign, labelsInstanceSign
+
+
+def pointsToMesh(mesh, asset, intensityAsset, semanticsAsset, labelsInstanceAsset, 
+                scene, intensity, semantics, labelsInstance):
+    # http://www.open3d.org/docs/latest/tutorial/geometry/ray_casting.html
+    # Calulate intersection for scene to mesh points
+    legacyMesh = o3d.t.geometry.TriangleMesh.from_legacy(mesh)
+    sceneRays = o3d.t.geometry.RaycastingScene()
+    sceneRays.add_triangles(legacyMesh)
+
+    raysVectorsScene = []
+    for point in scene:
+        raysVectorsScene.append([0, 0, 0, point[0], point[1], point[2]])
+
+    rays = o3d.core.Tensor(raysVectorsScene, dtype=o3d.core.Dtype.Float32)
+    ans = sceneRays.cast_rays(rays)
+    hit = ans['t_hit'].isfinite()
+    pointsOnMesh = rays[hit][:,:3] + rays[hit][:,3:]*ans['t_hit'][hit].reshape((-1,1))
+
+    # Split between intersect and non intersect
+    intensityIntersect = intensity[hit.numpy()]
+    semanticsIntersect = semantics[hit.numpy()]
+    labelsInstanceIntersect = labelsInstance[hit.numpy()]
+    nonHit = np.logical_not(hit.numpy())
+    sceneNonIntersect = scene[nonHit]
+    intensityNonIntersect = intensity[nonHit]
+    semanticsNonIntersect = semantics[nonHit]
+    labelsInstanceNonIntersect = labelsInstance[nonHit]
+    
+    newAssetScene = []
+    for vector in pointsOnMesh:
+        newAssetScene.append(vector.numpy())
+
+    # Calulate intersection for sign points
+    raysVectorsMesh = []
+    for point in asset:
+        raysVectorsMesh.append([0, 0, 0, point[0], point[1], point[2]])
+
+    rays = o3d.core.Tensor(raysVectorsMesh, dtype=o3d.core.Dtype.Float32)
+    ans = sceneRays.cast_rays(rays)
+    hit = ans['t_hit'].isfinite()
+    pointsOnMesh = rays[hit][:,:3] + rays[hit][:,3:]*ans['t_hit'][hit].reshape((-1,1))
+
+    newAsset = []
+    for vector in pointsOnMesh:
+        newAsset.append(vector.numpy())
+    
+    intensityAsset = intensityAsset[hit.numpy()] 
+    semanticsAsset = semanticsAsset[hit.numpy()]
+    labelsInstanceAsset = labelsInstanceAsset[hit.numpy()]
+
+    print(len(newAsset))
+    print(len(newAssetScene))
+
+    if len(newAsset) == 0 or len(newAssetScene) == 0:
+        print("GOT NONE OF THE OG SIGN {} OR NONE OF SCENE {}".format(len(newAsset), len(newAssetScene)))
+        return False, None, None, None, None, None, None, None, None, None
+
+    # Fix the intensity of each of the points in the scene that were pulled into the sign by using the closest sign point
+    pcdAssetNearest = o3d.geometry.PointCloud()
+    pcdAssetNearest.points = o3d.utility.Vector3dVector(newAsset)
+    pcd_tree = o3d.geometry.KDTreeFlann(pcdAssetNearest)
+    for pointIndex in range(0, len(newAssetScene)):
+        [k, idx, _] = pcd_tree.search_knn_vector_3d(point, 1)
+        intensityIntersect[pointIndex] = intensityAsset[idx]
+        semanticsIntersect[pointIndex] = semanticsAsset[idx]
+        labelsInstanceIntersect[pointIndex] = labelsInstanceAsset[idx]
+
+    newAsset, intensityAsset, semanticsAsset, labelsInstanceAsset = combine(newAsset, intensityAsset, semanticsAsset, labelsInstanceAsset, 
+                                                                    newAssetScene, intensityIntersect, semanticsIntersect, labelsInstanceIntersect)
+
+    return True, sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, labelsInstanceNonIntersect, newAsset, intensityAsset, semanticsAsset, labelsInstanceAsset
+
+
+def signReplace(sign, intensitySign, semanticsSign, labelsInstanceSign, scene, intensity, semantics, labelsInstance, details):
+    
+    # Get bounds to align the sign to 
+    print(np.shape(sign))
+    pcdSign = o3d.geometry.PointCloud()
+    pcdSign.points = o3d.utility.Vector3dVector(sign)
+    obb = pcdSign.get_oriented_bounding_box()
+    signCenter = obb.get_center()
+    minSign, maxSign = closestBoundingTwo(obb.get_min_bound(), obb.get_max_bound(), sign)
+
+    # Create shape mesh
+    signMesh = None
+    signType = random.randint(0, 1)
+    if (signType == 0):
+        signMesh = o3d.geometry.TriangleMesh.create_box(width=0.05, height=0.6, depth=0.75)
+        details["sign"] = "speed"
+    else:
+        signMesh = createStopSign(signCenter)
+        details["sign"] = "stop"
+
+    # Move the mesh to the 
+    signMesh.translate(signCenter, relative=False)
+    angleSign = getAngleRadians(obb.get_center(), minSign, signMesh.get_min_bound())
+
+    # Get two rotation options
+    rotation = signMesh.get_rotation_matrix_from_xyz((0, 0, angleSign * -1))
+    rotation2 = signMesh.get_rotation_matrix_from_xyz((0, 0, angleSign))
+    signMeshRotate1 = copy.deepcopy(signMesh)
+    signMeshRotate2 = copy.deepcopy(signMesh)
+    signMeshRotate1.rotate(rotation, center=signMeshRotate1.get_center())
+    signMeshRotate2.rotate(rotation2, center=signMeshRotate2.get_center())
+
+    # Get the rotation that is closer to the sign
+    dist1 = np.linalg.norm(minSign - signMeshRotate1.get_min_bound())
+    dist2 = np.linalg.norm(minSign - signMeshRotate2.get_min_bound())
+    if (dist1 < dist2):
+        signMesh = signMeshRotate1
+    else:
+        signMesh = signMeshRotate2
+
+    success, sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, labelsInstanceNonIntersect, sign, intensitySign, semanticsSign, labelsInstanceSign = pointsToMesh
+
+    return success, sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, labelsInstanceNonIntersect, sign, intensitySign, semanticsSign, labelsInstanceSign, details
+
+
+def scaleVehicle(asset, intensityAsset, semanticsAsset, labelsInstanceAsset, 
+                scene, intensity, semantics, labelsInstance, details):
+
+
+    # Prepare to create the mesh estimating normals
+    pcdAsset = o3d.geometry.PointCloud()
+    pcdAsset.points = o3d.utility.Vector3dVector(asset)
+    pcdAsset.estimate_normals()
+    pcdAsset.orient_normals_towards_camera_location()
+
+    # Create a mesh using the ball pivoting method
+    radii = [0.15, 0.15, 0.15, 0.15]
+    mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(pcdAsset, o3d.utility.DoubleVector(radii))
+    
+    # Scale the vehicle
+    mesh.scale(1.2, center=mesh.get_center())
+    details["scale"] = 1.2
+
+    # Prepare the shadow of the new mesh to see what is included
+    shadow = getLidarShadowMesh(np.array(mesh.vertices))
+    sceneMask = checkInclusionBasedOnTriangleMesh(scene, shadow)
+    
+    # Included in shadow
+    sceneIncluded = scene[sceneMask]
+    intensityIncluded = intensity[sceneMask]
+    semanticsIncluded = semantics[sceneMask]
+    labelsInstanceIncluded = labelsInstance[sceneMask]
+
+    # Not Included in the shadow
+    sceneMaskNot = np.logical_not(sceneMask)
+    sceneNotIncluded = scene[sceneMaskNot]
+    intensityNotIncluded = intensity[sceneMaskNot]
+    semanticsNotIncluded = semantics[sceneMaskNot]
+    labelsInstanceNotIncluded = labelsInstance[sceneMaskNot]
+
+    # Prepare the mesh for ray casting to move points to mesh
+    success, _, _, _, _, newAsset, newIntensityAsset, newSemanticsAsset, newLabelsInstanceAsset = pointsToMesh(mesh, asset, intensityAsset, semanticsAsset, labelsInstanceAsset, 
+                                                                                                        sceneIncluded, intensityIncluded, semanticsIncluded, labelsInstanceIncluded)
+
+    newAsset = alignZdim(newAsset, sceneNotIncluded, semanticsNotIncluded)
+
+    return success, sceneNotIncluded, intensityNotIncluded, semanticsNotIncluded, labelsInstanceNotIncluded, newAsset, newIntensityAsset, newSemanticsAsset, newLabelsInstanceAsset, details
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

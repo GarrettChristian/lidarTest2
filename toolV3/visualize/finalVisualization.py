@@ -1,15 +1,16 @@
 
 
 
-from laserscan import LaserScan, SemLaserScan
-from laserscanvisFinal import LaserScanVis
+from finalVisRangeImage import LaserScanVis, SemLaserScan
 import numpy as np
 import glob, os
 import argparse
 import shutil
 from pymongo import MongoClient
 import json
-
+from PIL import Image
+from PIL import ImageFont
+from PIL import ImageDraw 
 
 mutationCollection = None
 
@@ -22,6 +23,9 @@ finalVisDir = ""
 dedup = set()
 mutations = set()
 models = ["cyl", "spv", "sal"]
+
+scan = None
+vis = None
 
 color_map_alt = { # bgr
   0 : [0, 0, 0],
@@ -148,6 +152,10 @@ def handleOne(mutation, mutationId):
     """
 
     print("Saving {} {}".format(mutation, mutationId))
+
+    # imageList = []
+    imgs = []
+    font = ImageFont.truetype("/usr/share/fonts/truetype/freefont/FreeSansBold.ttf", 16)
     
     saveDir = finalVisDir + "/" + mutation + "/" + mutationId + "/"
 
@@ -157,38 +165,35 @@ def handleOne(mutation, mutationId):
     # assetSeq = 
     # assetScene =  
 
-
-    color_dict = color_map_alt
-    nclasses = len(color_dict)
-    scan = SemLaserScan(nclasses, color_dict, project=True)
-
     # og-id : original scan with original labels
     origScan = saveDir + "actual-og-" + mutationId + ".png"
-    vis = LaserScanVis(scan=scan,
-                    scan_names=[dataDir + item["baseSequence"] + "/velodyne/" + item["baseScene"] + ".bin"],
-                    label_names=[dataDir + item["baseSequence"] + "/labels/" + item["baseScene"] + ".label"])
+    vis.set_new_pcd(scan_name=dataDir + item["baseSequence"] + "/velodyne/" + item["baseScene"] + ".bin",
+                    label_name=dataDir + item["baseSequence"] + "/labels/" + item["baseScene"] + ".label")
     vis.save(origScan)
-    vis.destroy()
 
     # new-id : new scan with new labels
     newScan = saveDir + "actual-new-" + mutationId + ".png"
-    vis = LaserScanVis(scan=scan,
-                    scan_names=[toolDir + "done/velodyne/" + mutationId + ".bin"],
-                    label_names=[toolDir + "done/labels/actual/" + mutationId + ".label"])
+    vis.set_new_pcd(scan_name=toolDir + "done/velodyne/" + mutationId + ".bin",
+                    label_name=toolDir + "done/labels/actual/" + mutationId + ".label")
     vis.save(newScan)
-    vis.destroy()
 
-    modelSaves = {}
+    ogImage = Image.open(origScan)
+    newImage = Image.open(newScan)
+    drawOg = ImageDraw.Draw(ogImage)
+    drawNew = ImageDraw.Draw(newImage)
+    drawOg.text((0, 0), "Base Orig", (255,255,255), font=font)
+    drawNew.text((0, 0), "Base New", (255,255,255), font=font)
+    imgs.append(ogImage)
+    imgs.append(newImage)
+
 
     for model in models:
 
         # og-model-id : original scan with model labels (x3)
         ogModelSave = saveDir + model + "-og-" + mutationId + ".png"
-        vis = LaserScanVis(scan=scan,
-                        scan_names=[dataDir + item["baseSequence"] + "/velodyne/" + item["baseScene"] + ".bin"],
-                        label_names=[labelsDir + "/" + item["baseSequence"] + "/" + model + "/" + item["baseScene"] + ".label"])
+        vis.set_new_pcd(scan_name=dataDir + item["baseSequence"] + "/velodyne/" + item["baseScene"] + ".bin",
+                        label_name=labelsDir + item["baseSequence"] + "/" + model + "/" + item["baseScene"] + ".label")
         vis.save(ogModelSave)
-        vis.destroy()
 
         # og-model-asset-id : original asset scan with model labels (x3)
         # ogModelAssetSave = saveDir + "new-" + mutationId + ".png"
@@ -199,15 +204,82 @@ def handleOne(mutation, mutationId):
 
         # new-model-id : new scan with model labels (x3)
         newModelSave = saveDir + model + "-new-" + mutationId + ".png"
-        vis = LaserScanVis(scan=scan,
-                        scan_names=[toolDir + "done/velodyne/" + mutationId + ".bin"],
-                        label_names=[toolDir + "done/labels/" + model + "/" + mutationId + ".label"])
+        vis.set_new_pcd(scan_name=toolDir + "done/velodyne/" + mutationId + ".bin",
+                        label_name=toolDir + "done/labels/" + model + "/" + mutationId + ".label")
         vis.save(newModelSave)
-        vis.destroy()
 
-        modelSaves[model] = {}
-        modelSaves[model]["og"] = ogModelSave
-        modelSaves[model]["new"] = newModelSave
+        # imageList.append(ogModelSave)
+        # imageList.append(newModelSave)
+
+        ogModelImage = Image.open(ogModelSave)
+        newModelImage = Image.open(newModelSave)
+        drawOg = ImageDraw.Draw(ogModelImage)
+        drawNew = ImageDraw.Draw(newModelImage)
+        drawOg.text((0, 0), model + " Orig", (255,255,255), font=font)
+        drawNew.text((0, 0), model + " New", (255,255,255), font=font)
+        imgs.append(ogModelImage)
+        imgs.append(newModelImage)
+
+
+  
+    # Combine into one image
+    # https://stackoverflow.com/questions/30227466/combine-several-images-horizontally-with-python
+    combineSave = finalVisDir + "/" + mutation + "/" + mutationId + ".png"
+    # imgs = [ Image.open(i) for i in imageList ]
+    imgsComb = np.vstack( (np.asarray(i) for i in imgs ) )
+    imgsComb = Image.fromarray(imgsComb)
+    imgsComb.save(combineSave)
+
+    
+    
+    # scan = SemLaserScan(nclasses, color_dict, project=True)
+
+    # # og-id : original scan with original labels
+    # origScan = saveDir + "actual-og-" + mutationId + ".png"
+    # vis = LaserScanVis(scan=scan,
+    #                 scan_names=[dataDir + item["baseSequence"] + "/velodyne/" + item["baseScene"] + ".bin"],
+    #                 label_names=[dataDir + item["baseSequence"] + "/labels/" + item["baseScene"] + ".label"])
+    # vis.save(origScan)
+    # vis.destroy()
+
+    # # new-id : new scan with new labels
+    # newScan = saveDir + "actual-new-" + mutationId + ".png"
+    # vis = LaserScanVis(scan=scan,
+    #                 scan_names=[toolDir + "done/velodyne/" + mutationId + ".bin"],
+    #                 label_names=[toolDir + "done/labels/actual/" + mutationId + ".label"])
+    # vis.save(newScan)
+    # vis.destroy()
+
+    # modelSaves = {}
+
+    # for model in models:
+
+    #     # og-model-id : original scan with model labels (x3)
+    #     ogModelSave = saveDir + model + "-og-" + mutationId + ".png"
+    #     vis = LaserScanVis(scan=scan,
+    #                     scan_names=[dataDir + item["baseSequence"] + "/velodyne/" + item["baseScene"] + ".bin"],
+    #                     label_names=[labelsDir + "/" + item["baseSequence"] + "/" + model + "/" + item["baseScene"] + ".label"])
+    #     vis.save(ogModelSave)
+    #     vis.destroy()
+
+    #     # og-model-asset-id : original asset scan with model labels (x3)
+    #     # ogModelAssetSave = saveDir + "new-" + mutationId + ".png"
+    #     # vis = LaserScanVis(scan=scan,
+    #     #                 scan_names=[toolDir + "done/velodyne/" + mutationId + ".bin"],
+    #     #                 label_names=[toolDir + "done/labels/actual/" + mutationId + ".label"])
+    #     # vis.save(newScan)
+
+    #     # new-model-id : new scan with model labels (x3)
+    #     newModelSave = saveDir + model + "-new-" + mutationId + ".png"
+    #     vis = LaserScanVis(scan=scan,
+    #                     scan_names=[toolDir + "done/velodyne/" + mutationId + ".bin"],
+    #                     label_names=[toolDir + "done/labels/" + model + "/" + mutationId + ".label"])
+    #     vis.save(newModelSave)
+    #     vis.destroy()
+
+    #     modelSaves[model] = {}
+    #     modelSaves[model]["og"] = ogModelSave
+    #     modelSaves[model]["new"] = newModelSave
   
     
 
@@ -251,6 +323,8 @@ def main():
     global dataDir
     global labelsDir
     global toolDir
+    global scan
+    global vis
 
     print("\n\n------------------------------")
     print("\n\nStarting Range Image Conversion\n\n")
@@ -267,6 +341,14 @@ def main():
         finalData = json.load(f)
 
     setUpDir(finalData)
+
+    # Set up visualization
+    color_dict = color_map_alt
+    nclasses = len(color_dict)
+    scan = SemLaserScan(nclasses, color_dict, project=True)
+    vis = LaserScanVis(scan=scan,
+                    scan_name=dataDir + "00/velodyne/000000.bin",
+                    label_name=dataDir + "00/labels/000000.label")
 
     createImages(finalData)
 

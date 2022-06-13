@@ -12,7 +12,8 @@
 # mut="SCENE_REMOVE"
 # mut="ADD_ROTATE"
 # mut="SIGN_REPLACE"
-mut="SCENE_INTENSITY"
+# mut="SCENE_INTENSITY"
+mut="SCENE_SCALE"
 basePath="/home/garrett/Documents/data/dataset/sequences/"
 seq="00"
 scene="000000"
@@ -22,7 +23,7 @@ assetId="00-000000-213"
 # assetId="00-000000-1"
 # python semFuzzLidar.py -path $basePath 
 # python semFuzzLidar.py -path $basePath -m $mut
-# python semFuzzLidar.py -path $basePath -m $mut -vis -ns
+python semFuzzLidar.py -path $basePath -m $mut -vis -ns
 # python semFuzzLidar.py -path $basePath -m $mut -seq $seq -scene $scene -ns -vis
 # python semFuzzLidar.py -path $basePath -m $mut -seq $seq -scene $scene -ns
 # python semFuzzLidar.py -path $basePath -m $mut -seq $seq -scene $scene -ns -vis -assetId $assetId -rotate 0

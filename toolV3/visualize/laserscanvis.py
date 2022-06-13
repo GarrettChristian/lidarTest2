@@ -269,10 +269,10 @@ class LaserScanVis:
   def run(self):
     vispy.app.run()
 
-  def save(self, location):
-    # needed to specify size since it gets multiplied by pixel width
-    image = self.img_canvas.render(size=(1024, 64))
-    print(self.img_canvas.size)
-    print(self.img_canvas.pixel_scale)
-    print(np.shape(image))
-    io.write_png(location, image)
+  # def save(self, location):
+  #   # needed to specify size since it gets multiplied by pixel width
+  #   image = self.img_canvas.render(size=(1024, 64))
+  #   print(self.img_canvas.size)
+  #   print(self.img_canvas.pixel_scale)
+  #   print(np.shape(image))
+  #   io.write_png(location, image)

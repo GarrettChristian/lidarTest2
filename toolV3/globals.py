@@ -133,18 +133,18 @@ color_map_alt = { # rgb
 
 # Enum of the different types of mutations supported
 class Mutation(Enum):
-    ADD_ROTATE = "ADD_ROTATE",
-    ADD_MIRROR_ROTATE = "ADD_MIRROR_ROTATE",
+    # ADD_ROTATE = "ADD_ROTATE",
+    # ADD_MIRROR_ROTATE = "ADD_MIRROR_ROTATE",
     # SCENE_ROTATE = "ADD_ROTATE",
     # SCENE_MIRROR_ROTATE = "ADD_MIRROR_ROTATE",
     
-    SCENE_INTENSITY = "SCENE_INTENSITY"
-    SCENE_DEFORM = "SCENE_DEFORM"
-
-    SCENE_REMOVE = "SCENE_REMOVE",
+    # SCENE_INTENSITY = "SCENE_INTENSITY"
+    # SCENE_DEFORM = "SCENE_DEFORM"
+    # SCENE_REMOVE = "SCENE_REMOVE",
+    # SIGN_REPLACE = "SIGN_REPLACE"
 
     # SCENE_TRANSLATE = "SCENE_TRANSLATE"
-    # SCENE_SCALE = "SCENE_SCALE"
+    SCENE_SCALE = "SCENE_SCALE"
 
     # SCENE_NOISE = "SCENE_NOISE"
     # SCENE_REMOVE_ROTATE = "SCENE_REMOVE_ROTATE"
@@ -212,7 +212,7 @@ vehicles = set()
 evalMutationFlag = True
 saveMutationFlag = True
 
-
+saveAt = ""
 stageDir = ""
 dataRoot = ""
 resultDir = ""
@@ -317,7 +317,7 @@ def getBinsLabels(path, sequence, scene):
     return binFilesRun, labelFilesRun
 
 
-def setUpDataFolders(threads):
+def setUpDataFolders(threads, saveAt):
     global stageDir
     global dataRoot
     global resultDir
@@ -362,7 +362,7 @@ def setUpDataFolders(threads):
     """
 
     # make a top level data dir
-    dataDir = curDir + "/data"
+    dataDir = curDir + "/" + saveAt
     isExist = os.path.exists(dataDir)
     if not isExist:
         os.makedirs(dataDir)
@@ -552,6 +552,8 @@ def init(args):
     global evalMutationFlag
     global saveMutationFlag
 
+    global saveAt
+
 
     print("Running Setup")
 
@@ -572,9 +574,6 @@ def init(args):
 
     threads = args.t
     print("Threads: {}".format(threads))
-
-    print("Setting up result folder pipeline")
-    setUpDataFolders(threads)
 
     print("Selecting mutations to use")
     mutationsEnabled = prepareMutations(args.m)
@@ -598,6 +597,10 @@ def init(args):
 
     for vehicle in instancesVehicle.keys():
         vehicles.add(vehicle)
+
+    if (saveMutationFlag):
+        print("Setting up result folder pipeline")
+        setUpDataFolders(threads, args.save)
 
 
 
