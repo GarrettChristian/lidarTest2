@@ -1464,6 +1464,10 @@ def pointsToMesh(mesh, asset, intensityAsset, semanticsAsset, labelsInstanceAsse
     sceneRays = o3d.t.geometry.RaycastingScene()
     sceneRays.add_triangles(legacyMesh)
 
+    if (np.shape(scene)[0] < 1 or np.shape(asset)[0] < 1):
+        print("SCENE or ASSET PROVIDED EMPTY: SCENE {}, ASSET {}".format(np.shape(scene)[0], np.shape(asset)[0]))
+        return False, None, None, None, None, None, None, None, None
+
     raysVectorsScene = []
     for point in scene:
         raysVectorsScene.append([0, 0, 0, point[0], point[1], point[2]])
@@ -1510,7 +1514,7 @@ def pointsToMesh(mesh, asset, intensityAsset, semanticsAsset, labelsInstanceAsse
 
     if len(newAsset) == 0 or len(newAssetScene) == 0:
         print("GOT NONE OF THE OG SIGN {} OR NONE OF SCENE {}".format(len(newAsset), len(newAssetScene)))
-        return False, None, None, None, None, None, None, None, None, None
+        return False, None, None, None, None, None, None, None, None
 
     # Fix the intensity of each of the points in the scene that were pulled into the sign by using the closest sign point
     pcdAssetNearest = o3d.geometry.PointCloud()
@@ -1568,7 +1572,8 @@ def signReplace(sign, intensitySign, semanticsSign, labelsInstanceSign, scene, i
     else:
         signMesh = signMeshRotate2
 
-    success, sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, labelsInstanceNonIntersect, sign, intensitySign, semanticsSign, labelsInstanceSign = pointsToMesh
+    success, sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, labelsInstanceNonIntersect, sign, intensitySign, semanticsSign, labelsInstanceSign = pointsToMesh(signMesh, sign, intensitySign, semanticsSign, labelsInstanceSign, 
+                                                                                                                                                                    scene, intensity, semantics, labelsInstance)
 
     return success, sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, labelsInstanceNonIntersect, sign, intensitySign, semanticsSign, labelsInstanceSign, details
 
@@ -1586,6 +1591,11 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, labelsInstanceAsset,
     # Create a mesh using the ball pivoting method
     radii = [0.15, 0.15, 0.15, 0.15]
     mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(pcdAsset, o3d.utility.DoubleVector(radii))
+
+    # Check that the mesh is valid
+    if (np.shape(np.array(mesh.vertices))[0] < 1 or np.shape(np.array(mesh.triangles))[0] < 1):
+        print("MESH NOT SUFFICENT: Vertices {} Triangles {}".format(np.shape(np.array(mesh.vertices))[0], np.shape(np.array(mesh.triangles))[0]))
+        return False, None, None, None, None, None, None, None, None, None
     
     # Scale the vehicle
     mesh.scale(1.2, center=mesh.get_center())
@@ -1608,11 +1618,17 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, labelsInstanceAsset,
     semanticsNotIncluded = semantics[sceneMaskNot]
     labelsInstanceNotIncluded = labelsInstance[sceneMaskNot]
 
+    
+
     # Prepare the mesh for ray casting to move points to mesh
     success, _, _, _, _, newAsset, newIntensityAsset, newSemanticsAsset, newLabelsInstanceAsset = pointsToMesh(mesh, asset, intensityAsset, semanticsAsset, labelsInstanceAsset, 
                                                                                                         sceneIncluded, intensityIncluded, semanticsIncluded, labelsInstanceIncluded)
 
-    newAsset = alignZdim(newAsset, sceneNotIncluded, semanticsNotIncluded)
+    # newAsset = alignZdim(newAsset, sceneNotIncluded, semanticsNotIncluded)
+
+    # print(np.shape(newAsset))
+    if (success and np.shape(newAsset)[0] < 10):
+        success = False
 
     return success, sceneNotIncluded, intensityNotIncluded, semanticsNotIncluded, labelsInstanceNotIncluded, newAsset, newIntensityAsset, newSemanticsAsset, newLabelsInstanceAsset, details
 

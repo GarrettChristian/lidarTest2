@@ -5,23 +5,24 @@
 
 
 
-
+# 00-000203-121', 'sequence': '00', 'scene': '000203'
 
 # mut="SCENE_DEFORM"
 # mut="SCENE_MIRROR_ROTATE"
 # mut="SCENE_REMOVE"
 # mut="ADD_ROTATE"
 # mut="SIGN_REPLACE"
-mut="SCENE_INTENSITY"
+mut="SCENE_SCALE"
+# mut="SCENE_INTENSITY"
 basePath="/home/garrett/Documents/data/dataset/sequences/"
-seq="00"
-scene="000000"
-# seq="04"
-# scene="000244"
-assetId="00-000000-213"
-# assetId="00-000000-1"
+# seq="00"
+# scene="000000"
+seq="05"
+scene="001432"
+# assetId="00-000000-213"
+assetId="05-001432-3"
 # python semFuzzLidar.py -path $basePath 
-# python semFuzzLidar.py -path $basePath -m $mut
+python semFuzzLidar.py -path $basePath -m $mut
 # python semFuzzLidar.py -path $basePath -m $mut -vis -ns
 # python semFuzzLidar.py -path $basePath -m $mut -seq $seq -scene $scene -ns -vis
 # python semFuzzLidar.py -path $basePath -m $mut -seq $seq -scene $scene -ns

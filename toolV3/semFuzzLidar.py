@@ -481,7 +481,7 @@ def performMutation():
             pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, assetRecord = mongoUtil.getRandomAsset()
 
     elif (assetLocation == "SCENE"):
-        if ("DEFORM" in mutationSet):
+        if ("DEFORM" in mutationSet or "SCALE" in mutationSet):
             pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, assetRecord = mongoUtil.getRandomAssetOfTypesWithinScene(globals.vehicles, sequence, scene)
         else:
             pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, assetRecord = getRandomAssetWithinScene(sequence, scene)
@@ -725,14 +725,14 @@ def runMutations(threadNum):
     errors = []
 
     # Until signaled to end TODO
-    for num in range (0, 1):
+    for num in range (0, 5):
 
         mutationDetails = []
         bins = []
         labels = []
 
         # Mutate
-        batchNum = 1
+        batchNum = 100
         for index in range(0, batchNum):
             print("\n\n{}".format((num * batchNum) + index))
 
@@ -778,6 +778,7 @@ def runMutations(threadNum):
     print(json.dumps(finalData, indent=4))
     print()
 
+    # Save final data
     if (globals.saveMutationFlag):
         with open(globals.dataDir + '/finalData.json', 'w') as outfile:
             json.dump(finalData, outfile, indent=4)
