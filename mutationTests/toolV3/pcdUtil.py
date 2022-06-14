@@ -1598,31 +1598,20 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, labelsInstanceAsset,
         return False, None, None, None, None, None, None, None, None, None
     
     # Scale the vehicle
-    mesh.scale(1.2, center=mesh.get_center())
-    details["scale"] = 1.2
+    scale = 1.05
+    mesh.scale(scale, center=mesh.get_center())
+    details["scale"] = scale
 
     # Prepare the shadow of the new mesh to see what is included
     shadow = getLidarShadowMesh(np.array(mesh.vertices))
     sceneMask = checkInclusionBasedOnTriangleMesh(scene, shadow)
     
-    # Included in shadow
-    sceneIncluded = scene[sceneMask]
-    intensityIncluded = intensity[sceneMask]
-    semanticsIncluded = semantics[sceneMask]
-    labelsInstanceIncluded = labelsInstance[sceneMask]
-
-    # Not Included in the shadow
-    sceneMaskNot = np.logical_not(sceneMask)
-    sceneNotIncluded = scene[sceneMaskNot]
-    intensityNotIncluded = intensity[sceneMaskNot]
-    semanticsNotIncluded = semantics[sceneMaskNot]
-    labelsInstanceNotIncluded = labelsInstance[sceneMaskNot]
-
-    
 
     # Prepare the mesh for ray casting to move points to mesh
-    success, _, _, _, _, newAsset, newIntensityAsset, newSemanticsAsset, newLabelsInstanceAsset = pointsToMesh(mesh, asset, intensityAsset, semanticsAsset, labelsInstanceAsset, 
-                                                                                                        sceneIncluded, intensityIncluded, semanticsIncluded, labelsInstanceIncluded)
+    # success, _, _, _, _, newAsset, newIntensityAsset, newSemanticsAsset, newLabelsInstanceAsset = pointsToMesh(mesh, asset, intensityAsset, semanticsAsset, labelsInstanceAsset, 
+    #                                                                                                     sceneIncluded, intensityIncluded, semanticsIncluded, labelsInstanceIncluded)
+    success, sceneNotIncluded, intensityNotIncluded, semanticsNotIncluded, labelsInstanceNotIncluded, newAsset, newIntensityAsset, newSemanticsAsset, newLabelsInstanceAsset = pointsToMesh(mesh, asset, intensityAsset, semanticsAsset, labelsInstanceAsset, 
+                                                                                                            scene, intensity, semantics, labelsInstance)
 
     # newAsset = alignZdim(newAsset, sceneNotIncluded, semanticsNotIncluded)
 
@@ -1630,6 +1619,7 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, labelsInstanceAsset,
     if (success and np.shape(newAsset)[0] < 10):
         success = False
 
+    # return success, sceneNotIncluded, intensityNotIncluded, semanticsNotIncluded, labelsInstanceNotIncluded, newAsset, newIntensityAsset, newSemanticsAsset, newLabelsInstanceAsset, details
     return success, sceneNotIncluded, intensityNotIncluded, semanticsNotIncluded, labelsInstanceNotIncluded, newAsset, newIntensityAsset, newSemanticsAsset, newLabelsInstanceAsset, details
 
 
