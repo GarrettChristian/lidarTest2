@@ -1,5 +1,6 @@
 
 from cProfile import label
+from dis import dis
 from pickletools import float8
 import numpy as np
 
@@ -82,7 +83,7 @@ pcdNonRoad.points = o3d.utility.Vector3dVector(pcdArrExceptRoad)
 
 
 
-maskSign = (semantics == 80) | (semantics == 81)
+maskSign = (semantics == 71)
 
 pcdArrOnlySigns = pcd_arr[maskSign, :]
 
@@ -100,16 +101,25 @@ colors[labels < 0] = 0
 pcdSigns.colors = o3d.utility.Vector3dVector(colors[:, :3])
 # o3d.visualization.draw_geometries([pcdSigns])
 
-oneSign = pcdArrOnlySigns[labels == 2, :]
+display = [pcdRoad]
 
-pcdSign = o3d.geometry.PointCloud()
-pcdSign.points = o3d.utility.Vector3dVector(oneSign)
+uniqueLabels = set()
+for labelNum in labels:
+    uniqueLabels.add(labelNum)
 
+for sign in uniqueLabels:
+    if (sign != -1):
+        oneSign = pcdArrOnlySigns[labels == sign, :]
 
-obb = pcdSign.get_oriented_bounding_box()
-obb.color = (0, 1, 0)
+        pcdSign = o3d.geometry.PointCloud()
+        pcdSign.points = o3d.utility.Vector3dVector(oneSign)
+        obb = pcdSign.get_oriented_bounding_box()
+        obb.color = (0, 1, 0)
 
-o3d.visualization.draw_geometries([pcdSign, obb, pcdRoad])
+        display.append(pcdSign)
+        display.append(obb)
+
+o3d.visualization.draw_geometries(display)
 
 
 
