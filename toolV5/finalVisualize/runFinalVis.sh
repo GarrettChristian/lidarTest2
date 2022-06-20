@@ -9,16 +9,18 @@
 
 # Options
 
-data="/home/garrett/Documents/data/dataset/sequences/"
-labels="/home/garrett/Documents/data/resultsBase/"
-toolData="/home/garrett/Documents/lidarTest2/toolV4/data/"
+data=/home/garrett/Documents/data/dataset/sequences/
+labels=/home/garrett/Documents/data/resultsBase/
+toolData="/home/garrett/Documents/lidarTest2/toolV5/data/"
 
+
+# toolData=/home/garrett/Documents/lidarTest2/mutationTests/toolV3/data/
 
 # -------------------------------------------------------------------------------------------------------------------
 
 # Run command 
 
-python semFuzzLidar.py -pdata "$data" -plabels "$labels" -ptool "$toolData" 
+python finalVisualization.py -pdata "$data" -plabels "$labels" -ptool "$toolData" 
 
 # -------------------------------------------------------------------------------------------------------------------
 

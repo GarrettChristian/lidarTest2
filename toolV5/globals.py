@@ -145,7 +145,8 @@ class Mutation(Enum):
 
 binFiles = []
 labelFiles = []
-path = ""
+pathVel = ""
+pathLbl = ""
 visualize = ""
 mutationsEnabled = []
 
@@ -160,6 +161,10 @@ vehicles = set()
 
 evalMutationFlag = True
 saveMutationFlag = True
+
+
+batchNum = 0
+iterationNum = 0
 
 
 # Paths to the directories where specific things are stored
@@ -209,8 +214,8 @@ def prepareMutations(mutationsGiven):
 """
 Setup step to get all potential bin files
 """
-def getBinsLabels(path, sequence, scene):
-    print("Parsing {} :".format(path))
+def getBinsLabels(pathVel, pathLabel, sequence, scene):
+    print("Parsing {} bins and {} labels :".format(pathVel, pathLabel))
     print("Collecting Labels and Bins for sequence {}".format(sequence))
 
     binFilesRun = []
@@ -218,19 +223,23 @@ def getBinsLabels(path, sequence, scene):
 
     # Specific Scene
     if (scene):
-        currPath = path + str(sequence).rjust(2, '0')
+        folderNum = str(sequenceNum).rjust(2, '0')
+        currPathVel = pathVel + folderNum
+        currPathLbl = pathLabel + folderNum
 
-        labelFilesRun = [currPath + "/labels/" + scene + ".label"]
-        binFilesRun = [currPath + "/velodyne/" + scene + ".bin"]
+        labelFilesRun = [currPathVel + "/labels/" + scene + ".label"]
+        binFilesRun = [currPathLbl + "/velodyne/" + scene + ".bin"]
+
     # Any scene
     else:
         for sequenceNum in sequence:
         
             folderNum = str(sequenceNum).rjust(2, '0')
-            currPath = path + folderNum
+            currPathVel = pathVel + folderNum
+            currPathLbl = pathLabel + folderNum
 
-            labelFilesSequence = np.array(glob.glob(currPath + "/labels/*.label", recursive = True))
-            binFilesSequence = np.array(glob.glob(currPath + "/velodyne/*.bin", recursive = True))
+            labelFilesSequence = np.array(glob.glob(currPathLbl + "/labels/*.label", recursive = True))
+            binFilesSequence = np.array(glob.glob(currPathVel + "/velodyne/*.bin", recursive = True))
             print("Parsing Scene {}".format(folderNum))
             
 
@@ -247,7 +256,7 @@ def getBinsLabels(path, sequence, scene):
     return binFilesRun, labelFilesRun
 
 
-def setUpDataFolders(threads, saveAt):
+def setUpDataFolders(threads):
     global stageDir
     global dataRoot
     global resultDir
@@ -292,7 +301,7 @@ def setUpDataFolders(threads, saveAt):
     """
 
     # make a top level data dir
-    dataDir = curDir + "/" + saveAt
+    dataDir = curDir + "/data"
     isExist = os.path.exists(dataDir)
     if not isExist:
         os.makedirs(dataDir)
@@ -425,7 +434,7 @@ def setUpDataFolders(threads, saveAt):
         print("Removing {}".format(doneDir))
     # isExist = os.path.exists(doneDir)
     # if not isExist:
-    #     os.makedirs(doneDir)
+    os.makedirs(doneDir)
     
     # done
     doneVelDir = doneDir + "/velodyne"
@@ -468,7 +477,8 @@ def init(args):
     # Paths for base data
     global binFiles
     global labelFiles
-    global path
+    global pathVel
+    global pathLbl
 
     # Mutations to choose from
     global mutationsEnabled
@@ -487,6 +497,9 @@ def init(args):
     global visualize
 
     global saveAt
+
+    global batchNum
+    global iterationNum
 
 
     print("Running Setup")
@@ -512,10 +525,12 @@ def init(args):
 
 
     # Set up the bins and label files to randomly select from
-    path = args.path
-    binFiles, labelFiles = getBinsLabels(args.path, args.seq, args.scene)
+    pathVel = args.path
+    pathLbl = args.lbls
+    binFiles, labelFiles = getBinsLabels(args.path, args.lbls, args.seq, args.scene)
 
-
+    batchNum = int(args.b)
+    iterationNum = int(args.i)
     
     # Specific mutation arguments
     if (args.intensity):
@@ -534,8 +549,7 @@ def init(args):
     # Only reset the save location if saving is enabled
     if (saveMutationFlag):
         print("Setting up result folder pipeline")
-        setUpDataFolders(threads, args.save)
-
+        setUpDataFolders(threads)
 
 
     

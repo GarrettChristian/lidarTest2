@@ -16,7 +16,6 @@ import json
 
 import globals
 
-from mongoUtil import mongoConnect, saveMutation
 import mongoUtil
 import pcdUtil as pcdUtil
 import fileIoUtil
@@ -30,6 +29,7 @@ import eval
 """
 formatSecondsToHhmmss
 Helper to convert seconds to hours minutes and seconds
+
 @param seconds
 @return formatted string of hhmmss
 """
@@ -62,31 +62,7 @@ def performMutation():
     details["batchId"] = globals.batchId
     details["mutation"] = mutationSplitString
 
-    # Select Seed
-    idx = random.choice(range(len(globals.labelFiles)))
-    print(globals.binFiles[idx])
-    head_tail = os.path.split(globals.binFiles[idx])
-    scene = head_tail[1]
-    scene = scene.replace('.bin', '')
-  
-    head_tail = os.path.split(head_tail[0])
-    head_tail = os.path.split(head_tail[0])
-    sequence = head_tail[1]
-    details["baseSequence"] = sequence
-    details["baseScene"] = scene
-
-    # Base:
-    pcdArr, intensity, semantics, labelInstance = fileIoUtil.openLabelBinFiles(globals.binFiles[idx], globals.labelFiles[idx])
-    pcdArrAsset = None
-    intensityAsset = None
-    semanticsAsset = None
-    labelInstanceAsset = None
-    assetRecord = None
-    pcdArrOriginal = np.copy(pcdArr)
-
-    success = True
-    combine = True
-
+    # mutation
     mutationSplit = mutationSplitString.split('_')
     assetLocation = mutationSplit[0]
     
@@ -94,38 +70,66 @@ def performMutation():
     for mutation in mutationSplit:
         mutationSet.add(mutation)
 
+    # Base:
+    pcdArr, intensity, semantics, instances = None, None, None, None
+    pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset = None, None, None, None
+    assetRecord = None
+    success = True
+    combine = True
+
+    # if (assetLocation != "SIGN"):
+    #     pcdArr, intensity, semantics, instances = fileIoUtil.openLabelBinFiles(globals.binFiles[idx], globals.labelFiles[idx])
+    
+
     # Get the asset
-    if (globals.assetId != None):
-        pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, assetRecord = mongoUtil.getAssetById(globals.assetId)
 
-        if (assetRecord != None and "REMOVE" in mutationSet
-            and assetRecord["sequence"] == sequence and assetRecord["scene"] == scene):
-            pcdArr, intensity, semantics, labelInstance = pcdUtil.removeAssetScene(pcdArrAsset, pcdArr, intensity, semantics, labelInstance)
-        
-    elif (assetLocation == "ADD"):
-        if ("DEFORM" in mutationSet):
-            pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, assetRecord = mongoUtil.getRandomAssetOfTypes(globals.vehicles)
-        else:
-            pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, assetRecord = mongoUtil.getRandomAsset()
 
-    elif (assetLocation == "SCENE"):
-        if ("DEFORM" in mutationSet or "SCALE" in mutationSet):
-            pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, assetRecord = mongoUtil.getRandomAssetOfTypesWithinScene(globals.vehicles, sequence, scene)
+    # Adding asset to scene pick random sequence and scene as base
+    if (assetLocation == "ADD"):
+
+        # Select Seed
+        idx = random.choice(range(len(globals.labelFiles)))
+        print(globals.binFiles[idx])
+        head_tail = os.path.split(globals.binFiles[idx])
+        scene = head_tail[1]
+        scene = scene.replace('.bin', '')
+    
+        head_tail = os.path.split(head_tail[0])
+        head_tail = os.path.split(head_tail[0])
+        sequence = head_tail[1]
+        details["baseSequence"] = sequence
+        details["baseScene"] = scene
+        pcdArr, intensity, semantics, instances = fileIoUtil.openLabelBinFiles(globals.binFiles[idx], globals.labelFiles[idx])
+
+        if (globals.assetId != None):
+            pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = mongoUtil.getAssetById(globals.assetId)
+        elif ("DEFORM" in mutationSet):
+            pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = mongoUtil.getRandomAssetOfTypes(globals.vehicles)
         else:
-            pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, assetRecord = mongoUtil.getRandomAssetWithinScene(sequence, scene)
+            pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = mongoUtil.getRandomAsset()
+            # pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = mongoUtil.getRandomAssetOfTypes([81])
+
+    # Specific scene get asset then get the scene that asset is from
+    elif (assetLocation == "SCENE" or assetLocation == "SIGN"):
+
+        if (globals.assetId != None):
+            pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = mongoUtil.getAssetById(globals.assetId)
+        elif ("DEFORM" in mutationSet or "SCALE" in mutationSet):
+            # pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = mongoUtil.getRandomAssetOfTypesWithinScene(globals.vehicles, sequence, scene)
+            pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = mongoUtil.getRandomAssetOfTypes(globals.vehicles)
+        elif (assetLocation == "SIGN"):
+            pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = mongoUtil.getRandomAssetOfTypes([81])
+        else:
+            pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = mongoUtil.getRandomAsset()
+            # pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = mongoUtil.getRandomAssetWithinScene(sequence, scene)
 
         
         if (assetRecord != None):
-            pcdArr, intensity, semantics, labelInstance = pcdUtil.removeAssetScene(pcdArrAsset, pcdArr, intensity, semantics, labelInstance)
-    
-    elif (assetLocation == "SIGN"):
-        success, pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset = pcdUtil.getSignAsset(pcdArr, intensity, semantics, labelInstance)
-        assetRecord = {}
-        assetRecord["_id"] = "sign"
-        assetRecord["type"] = "sign"
-        assetRecord["typeNum"] = "sign"
-        if (success):
-            pcdArr, intensity, semantics, labelInstance = pcdUtil.removeAssetScene(pcdArrAsset, pcdArr, intensity, semantics, labelInstance)
+            pcdArr, intensity, semantics, instances = fileIoUtil.openLabelBin(globals.pathVel, globals.pathLbl, assetRecord["sequence"], assetRecord["scene"])
+            pcdArr, intensity, semantics, instances = pcdUtil.removeAssetScene(pcdArrAsset, pcdArr, intensity, semantics, instances)
+            details["baseSequence"] = assetRecord["sequence"]
+            details["baseScene"] = assetRecord["scene"]
+
 
     else:
         print("ERROR: {} NOT SUPPORTED".format(assetLocation))
@@ -144,26 +148,6 @@ def performMutation():
         details["typeNum"] = assetRecord["typeNum"]
     
 
-    # if globals.visualize:
-
-    #     # Get asset box
-    #     pcdAsset = o3d.geometry.PointCloud()
-    #     pcdAsset.points = o3d.utility.Vector3dVector(pcdArrAsset)
-    #     hull, _ = pcdAsset.compute_convex_hull()
-    #     hull_ls = o3d.geometry.LineSet.create_from_triangle_mesh(hull)
-    #     hull_ls.paint_uniform_color((0, 0, 1))
-
-    #     # Get scene
-    #     pcdScene = o3d.geometry.PointCloud()
-    #     pcdScene.points = o3d.utility.Vector3dVector(pcdArr)
-
-    #     # Color as intensity
-    #     colors = np.zeros(np.shape(pcdArr), dtype=np.float64)
-    #     colors[:, 0] = intensity
-    #     pcdScene.colors = o3d.utility.Vector3dVector(colors)
-
-    #     o3d.visualization.draw_geometries([hull_ls, pcdScene])
-
 
     for mutationIndex in range (1, len(mutationSplit)):
         if success:
@@ -175,11 +159,11 @@ def performMutation():
                 pcdArrAsset, details = pcdUtil.deform(pcdArrAsset, details)
             
             elif (mutationSplit[mutationIndex] == "SCALE"):
-                success, pcdArr, intensity, semantics, labelInstance, pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, details = pcdUtil.scaleVehicle(pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, 
-                                                                                                                                                            pcdArr, intensity, semantics, labelInstance, details) 
+                success, pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, pcdArr, intensity, semantics, instances, details = pcdUtil.scaleVehicle(pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, 
+                                                                                                                                                            pcdArr, intensity, semantics, instances, details) 
 
             elif (mutationSplit[mutationIndex] == "REMOVE"):
-                success, pcdArr, intensity, semantics, labelInstance = pcdUtil.replaceBasedOnShadow(pcdArrAsset, pcdArr, intensity, semantics, labelInstance)
+                success, pcdArr, intensity, semantics, instances = pcdUtil.replaceBasedOnShadow(pcdArrAsset, pcdArr, intensity, semantics, instances)
                 if mutationIndex + 1 == len(mutationSplit):
                     combine = False
 
@@ -192,19 +176,19 @@ def performMutation():
                 pcdArrAsset[:, axis] = pcdArrAsset[:, axis] * -1
 
             elif (mutationSplit[mutationIndex] == "ROTATE"):
-                success, pcdArrAsset, pcdArr, intensity, semantics, labelInstance, details = pcdUtil.rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, details)
+                success, pcdArrAsset, pcdArr, intensity, semantics, instances, details = pcdUtil.rotate(pcdArr, intensity, semantics, instances, pcdArrAsset, details)
 
             elif (mutationSplit[mutationIndex] == "REPLACE"):
-                success, pcdArr, intensity, semantics, labelInstance, pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, details = pcdUtil.signReplace(pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset, 
-                                                                                                                                                            pcdArr, intensity, semantics, labelInstance, details)
+                success, pcdArr, intensity, semantics, instances, pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, details = pcdUtil.signReplace(pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, 
+                                                                                                                                                            pcdArr, intensity, semantics, instances, details)
 
             else:
                 print("NOT SUPPORTED {}".format(mutationSplit[mutationIndex]))
 
 
     if success and combine:
-        pcdArr, intensity, semantics, labelInstance = pcdUtil.combine(pcdArr, intensity, semantics, labelInstance, 
-                                                                        pcdArrAsset, intensityAsset, semanticsAsset, labelInstanceAsset)
+        pcdArr, intensity, semantics, instances = pcdUtil.combine(pcdArr, intensity, semantics, instances, 
+                                                                        pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset)
        
 
     # Visualize the mutation if enabled
@@ -221,7 +205,7 @@ def performMutation():
         pcdScene = o3d.geometry.PointCloud()
         pcdScene.points = o3d.utility.Vector3dVector(pcdArr)
 
-        # Color as intensity
+        # Color as intensity or label
         colors = np.zeros(np.shape(pcdArr), dtype=np.float64)
         if ("INTENSITY" in mutationSet):
             colors[:, 2] = intensity
@@ -241,7 +225,7 @@ def performMutation():
     
 
     if (success):
-        xyziFinal, labelFinal = fileIoUtil.prepareToSave(pcdArr, intensity, semantics, labelInstance)
+        xyziFinal, labelFinal = fileIoUtil.prepareToSave(pcdArr, intensity, semantics, instances)
 
     
     return success, details, xyziFinal, labelFinal
@@ -261,17 +245,22 @@ def runMutations(threadNum):
 
     errors = []
 
-    # Until signaled to end TODO
-    for num in range (0, 1):
+    # Start timer for tool
+    ticAll = time.perf_counter()
+
+
+    for num in range (0, globals.iterationNum):
+
+        # Start timer for batch
+        tic = time.perf_counter()
 
         mutationDetails = []
         bins = []
         labels = []
 
         # Mutate
-        batchNum = 200
-        for index in range(0, batchNum):
-            print("\n\n{}".format((num * batchNum) + index))
+        for index in range(0, globals.batchNum):
+            print("\n\n{}".format((num * globals.batchNum) + index))
 
             success = False
             success, details, xyziFinal, labelFinal = performMutation()
@@ -311,9 +300,25 @@ def runMutations(threadNum):
             mongoUtil.saveMutationDetails(mutationDetails)
 
 
+        # End timer for batch
+        toc = time.perf_counter()
+        timeSeconds = toc - tic
+        timeFormatted = formatSecondsToHhmmss(timeSeconds)
+        print("Batch took {}".format(timeFormatted))
+
+
     print()
     print(json.dumps(finalData, indent=4))
     print()
+
+    # End timer
+    tocAll = time.perf_counter()
+    timeSeconds = tocAll - ticAll
+    timeFormatted = formatSecondsToHhmmss(timeSeconds)
+    print("Ran for {}".format(timeFormatted))
+    finalData["seconds"] = timeSeconds
+    finalData["time"] = timeFormatted
+
 
     # Save final data
     if (globals.saveMutationFlag):
@@ -343,16 +348,28 @@ def parse_args():
         nargs='?', const=0, default=range(0, 11))
     p.add_argument( "-scene", 
         help="specific scenario number provide full ie 002732")
+
     p.add_argument("-path", 
-        help="Path to the sequences", 
+        help="Path to the sequences velodyne bins", 
         nargs='?', const="/home/garrett/Documents/data/dataset/sequences/", 
         default="/home/garrett/Documents/data/dataset/sequences/")
+
+    p.add_argument("-lbls", 
+        help="Path to the sequences label files should corrispond with velodyne", 
+        nargs='?', const="/home/garrett/Documents/data/dataset2/sequences/", 
+        default="/home/garrett/Documents/data/dataset2/sequences/")
 
     p.add_argument('-m', required=False,
         help='Transformations to perform comma seperated example: ROTATE,ROTATE_MIRROR')
 
     p.add_argument("-t", 
         help="Thread number default to 1", 
+        nargs='?', const=1, default=1)
+    p.add_argument("-b", 
+        help="Batch to create before evaluating", 
+        nargs='?', const=100, default=100)
+    p.add_argument("-i", 
+        help="Iteration of batches", 
         nargs='?', const=1, default=1)
 
     p.add_argument('-vis', help='Visualize with Open3D',
@@ -410,12 +427,7 @@ def main():
         print("Concluding\n")
 
 
-    # End timer
-    toc = time.perf_counter()
-    timeSeconds = toc - tic
-    timeFormatted = formatSecondsToHhmmss(timeSeconds)
-
-    print("Ran for {}".format(timeFormatted))
+   
 
 
 if __name__ == '__main__':

@@ -176,7 +176,7 @@ class SemLaserScan(LaserScan):
   """Class that contains LaserScan with x,y,z,r,sem_label,sem_color_label,inst_label,inst_color_label"""
   EXTENSIONS_LABEL = ['.label']
 
-  def __init__(self, nclasses, sem_color_dict=None, project=False, H=64, W=1024, fov_up=3.0, fov_down=-25.0):
+  def __init__(self, nclasses, sem_color_dict=None, project=False, H=64, W=1024, fov_up=3.0, fov_down=-25.0, colorTypeIntensity=False):
     super(SemLaserScan, self).__init__(project, H, W, fov_up, fov_down)
     self.reset()
     self.nclasses = nclasses         # number of classes
@@ -197,6 +197,8 @@ class SemLaserScan(LaserScan):
                                             size=(max_inst_id, 3))
     # force zero to a gray-ish color
     self.inst_color_lut[0] = np.full((3), 0.1)
+
+    self.colorTypeIntensity = colorTypeIntensity
 
   def reset(self):
     """ Reset scan members. """
@@ -221,6 +223,10 @@ class SemLaserScan(LaserScan):
                                     dtype=np.int32)              # [H,W]  label
     self.proj_inst_color = np.zeros((self.proj_H, self.proj_W, 3),
                                     dtype=np.float)              # [H,W,3] color
+
+  
+  def setIntensityColorType(self, enabled):
+    self.colorTypeIntensity = enabled
 
   def open_label(self, filename):
     """ Open raw scan and fill in attributes
@@ -279,6 +285,14 @@ class SemLaserScan(LaserScan):
     # semantics
     self.proj_sem_label[mask] = self.sem_label[self.proj_idx[mask]]
     self.proj_sem_color[mask] = self.sem_color_lut[self.sem_label[self.proj_idx[mask]]]
+
+    # Use intensity rather than semantics
+    if self.colorTypeIntensity:
+      remColor = np.zeros((self.proj_H, self.proj_W, 3), dtype=np.float)
+      remColors = np.zeros((np.shape(self.proj_remission[mask])[0], (3)), dtype=np.float)
+      remColors[:, 0] = self.proj_remission[mask]
+      remColor[mask] = remColors
+      self.proj_sem_color = remColor
 
     # instances
     self.proj_inst_label[mask] = self.inst_label[self.proj_idx[mask]]

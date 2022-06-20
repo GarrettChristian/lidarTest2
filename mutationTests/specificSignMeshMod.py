@@ -172,6 +172,44 @@ def createStopSign(center):
     return sign
 
 
+
+def createCrossbuck(center):
+    
+    box = o3d.geometry.TriangleMesh.create_box(width=0.05, height=0.22, depth=1.22)
+    box2 = o3d.geometry.TriangleMesh.create_box(width=0.05, height=1.22, depth=0.22)
+
+    box.translate(center, relative=False)
+    box2.translate(center, relative=False)
+
+    box += box2
+
+    rotation2 = box.get_rotation_matrix_from_xyz((40, 0, 0))
+    box.rotate(rotation2, center=box.get_center())
+
+    return box
+
+
+def createYeild():
+    
+    yeildPoints = np.array([[0, -0.455, 0.91], 
+                            [0, 0, 0.91], 
+                            [0, 0.455, 0.91], 
+                            [0, 0, 0],
+                            [0.05, -0.455, 0.91], 
+                            [0.05, 0, 0.91], 
+                            [0.05, 0.455, 0.91], 
+                            [0.05, 0, 0]])
+
+    pcdSign = o3d.geometry.PointCloud()
+    pcdSign.points = o3d.utility.Vector3dVector(yeildPoints)
+
+    #  Get the asset's hull mesh
+    sign, _ = pcdSign.compute_convex_hull()
+
+    return sign
+
+
+
 """
 Main Method
 """
@@ -282,7 +320,9 @@ def main():
 
     # Create shape mesh
     # box = o3d.geometry.TriangleMesh.create_box(width=0.05, height=1, depth=1)
-    box = createStopSign(signCenter)
+    # box = createStopSign(signCenter)
+    # box = createCrossbuck(signCenter)
+    box = createYeild()
     boxCenter = box.get_center()
     x = signCenter[0] - boxCenter[0]
     y = signCenter[1] - boxCenter[1]
@@ -356,7 +396,7 @@ def main():
     pcdminmaxBox.points = o3d.utility.Vector3dVector([box.get_min_bound(), box.get_max_bound()])
     pcdminmaxBox.paint_uniform_color((0.50, 0.1, 1))
 
-    # o3d.visualization.draw_geometries([pcdSign, obb, abb, pcdRoad, pcdminmax, pcdminmaxBox, box, pcdminmaxBoxOG, boxCopy])
+    o3d.visualization.draw_geometries([pcdSign, obb, abb, pcdRoad, pcdminmax, pcdminmaxBox, box, pcdminmaxBoxOG, boxCopy])
     o3d.visualization.draw_geometries([obb, abb, pcdminmax, pcdminmaxBox, pcdminmaxBoxOG, pcdmoved, pcdNotSign])
     # o3d.visualization.draw_geometries([pcdNotSign, pcdSign])
     # o3d.visualization.draw_geometries([pcdmoved, pcdNotSign, obb, box, hull_ls44, pcdSign])

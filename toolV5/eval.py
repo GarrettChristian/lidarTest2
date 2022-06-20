@@ -151,6 +151,9 @@ models = [modelCyl, modelSpv, modelSal]
 
 # ------------------
 
+"""
+Runner for the Cylinder3D model
+"""
 def runCyl():
     print("running {}".format(modelCylinder3D))
 
@@ -161,11 +164,15 @@ def runCyl():
     # Change To Model Dir
     os.chdir(pathToModels + "/" + modelCylinder3D)
 
+    # runCommand += "2> /dev/null"
+
     # Run Model
     os.system(runCommand)
     
 
-
+"""
+Runner for the SPVNAS model
+"""
 def runSpv():
     print("running {}".format(modelSpvnas))
 
@@ -178,10 +185,15 @@ def runSpv():
     # Change To Model Dir
     os.chdir(pathToModels + "/" + modelSpvnas)
 
+    # runCommand += "2> /dev/null"
+
     # Run Model
     os.system(runCommand)
 
 
+"""
+Runner for the SalsaNext model
+"""
 def runSal():
     print("running {}".format(modelSalsaNext))
 
@@ -197,12 +209,22 @@ def runSal():
     # Change To Model Dir
     os.chdir(pathToModels + "/" + modelSalsaNext + "/train/tasks/semantic")
 
+    # runCommand += "2> /dev/null"
+
     # Run Model
     os.system(runCommand)
+
 
 # ------------------
 
 
+"""
+Jaccard accuracy 
+
+Modified from SemanticKITTI Development Kit 
+https://github.com/PRBonn/semantic-kitti-api
+https://github.com/PRBonn/semantic-kitti-api/blob/master/auxiliary/np_ioueval.py
+"""
 class iouEval:
   def __init__(self, n_classes, ignore=None):
     # classes
@@ -285,8 +307,18 @@ class iouEval:
 
 # ------------------
 
+"""
+Evaluates a label file against a prediction file
+Modified from SemanticKITTI Development Kit 
+https://github.com/PRBonn/semantic-kitti-api
+https://github.com/PRBonn/semantic-kitti-api/blob/master/evaluate_semantics.py
 
-# https://github.com/PRBonn/semantic-kitti-api/blob/master/evaluate_semantics.py
+@param label_file to evaluate as ground truth
+@param pred_file to evaluate against the ground truth
+@param model string that created the predictions
+@param details dictionary that enumerates what occured in this transformation
+@return results with accuracy results for this model and pair of labels
+"""
 def evalLabels(label_file, pred_file, model, details):
 
     # print()
@@ -365,22 +397,42 @@ def evalLabels(label_file, pred_file, model, details):
         type = name_label_mapping[learning_map_inv[learning_map[details["typeNum"]]]]
         typeJacChange = results[type] - baseAccuracyAsset[type]
         results["jaccardChangeAsset"] = typeJacChange
-        print(typeJacChange)
 
 
     # Bucketing
-    percentLoss = results["accuracyChange"] * 100
+    percentLossAcc = results["accuracyChange"] * 100
 
-    bucket = 0 # percentLoss >= 0.1 %
-    if (percentLoss < -5):
-        bucket = 3
-    elif (percentLoss < -1):
-        bucket = 2
-    elif (percentLoss < -0.1):
-        bucket = 1
+    bucketA = 0 # percentLoss >= 0.1 %
+    if (percentLossAcc < -5):
+        bucketA = 5
+    elif (percentLossAcc < -2):
+        bucketA = 4
+    elif (percentLossAcc < -1):
+        bucketA = 3
+    elif (percentLossAcc < -0.5):
+        bucketA = 2
+    elif (percentLossAcc < -0.1):
+        bucketA = 1
 
-    results["percentLoss"] = percentLoss
-    results["bucket"] = bucket
+    results["percentLossAcc"] = percentLossAcc
+    results["bucketA"] = bucketA
+
+    percentLossJac = results["jaccardChange"] * 100
+
+    bucketJ = 0 # percentLoss >= 0.1 %
+    if (percentLossJac < -5):
+        bucketJ = 5
+    elif (percentLossJac < -2):
+        bucketJ = 4
+    elif (percentLossJac < -1):
+        bucketJ = 3
+    elif (percentLossJac < -0.5):
+        bucketJ = 2
+    elif (percentLossJac < -0.1):
+        bucketJ = 1
+
+    results["percentLossJac"] = percentLossJac
+    results["bucketJ"] = bucketJ
 
 
     return results
@@ -388,7 +440,18 @@ def evalLabels(label_file, pred_file, model, details):
 
 # ------------------
 
+"""
+Evaluates a given set of mutations
+Note all bins and labels must be in:
+/data
+    /staging
+        /velodyne0
+        /labels0
 
+@param threadNum integer that shows where to get and put the results
+@param details list of detail dictionarys that enumerates what occured in this transformation
+@return details updated with the results from the models
+"""
 def evalBatch(threadNum, details):
 
     # Lock mutex
@@ -489,6 +552,12 @@ def evalBatch(threadNum, details):
 
 # ------------------
 
+
+"""
+Prepares the final details dictionary preloading some of the keys
+
+@return finalData dictionary with preloaded keys
+"""
 def prepFinalDetails():
     finalData = {}
 
@@ -511,13 +580,27 @@ def prepFinalDetails():
         mutationString = str(mutation).replace("Mutation.", "")
         finalData[mutationString] = {}
         finalData[mutationString]["count"] = 0
-        finalData[mutationString]["buckets"] = {}
+        finalData[mutationString]["bucketsA"] = {}
+        finalData[mutationString]["bucketsA2"] = {}
+        finalData[mutationString]["bucketsJ"] = {}
+        finalData[mutationString]["bucketsJ2"] = {}
 
-    finalData["buckets"] = {}
+    finalData["bucketsA"] = {}
+    finalData["bucketsA2"] = {}
+    finalData["bucketsJ"] = {}
+    finalData["bucketsJ2"] = {}
 
     return finalData
     
 
+"""
+Updates the final details dictionary after a batch
+This removes the bins and labels that do not meet the top five criteria
+
+@param details list of detail dictionarys that enumerates what occured in this transformation
+@param finalData ditctionary that describes what should be saved and how many of each mutation occured
+@return finalData dictionary updated with new mutations that occured
+"""
 def finalDetails(details, finalData):
 
     models = ["cyl", "spv", "sal"]
@@ -529,7 +612,10 @@ def finalDetails(details, finalData):
         # Add count for mutation
         finalData[detail["mutation"]]["count"] = finalData[detail["mutation"]]["count"] + 1
 
-        bucketFailKey = ""
+        bucketFailKeyA = ""
+        bucketFailKeyJ = ""
+        bucketFailKeyA2 = ""
+        bucketFailKeyJ2 = ""
 
         # Check if we have a lower accuracy change for this mutation
         for model in models:
@@ -575,23 +661,66 @@ def finalDetails(details, finalData):
 
 
 
-            # bucket data model
-            bucket = detail[model]["bucket"]
-            if (bucket != 0):
-                bucketFailKey += (model + "_")
+            # Accuracy bucket model 
+            bucketA = detail[model]["bucketA"]
+            if (bucketA != 0):
+                bucketFailKeyA += (model + "_")
+            if (bucketA > 1):
+                bucketFailKeyA2 += (model + "_")
 
-            countModelBucket = finalData[model][detail["mutation"]].get("bucket_" + str(bucket), 0)
-            finalData[model][detail["mutation"]]["bucket_" + str(bucket)] = countModelBucket + 1
+            countModelBucketA = finalData[model][detail["mutation"]].get("bucketA_" + str(bucketA), 0)
+            finalData[model][detail["mutation"]]["bucketA_" + str(bucketA)] = countModelBucketA + 1
+
+            # Jaccard bucket model
+            bucketJ = detail[model]["bucketJ"]
+            if (bucketJ > 0):
+                bucketFailKeyJ += (model + "_")
+            if (bucketJ > 1):
+                bucketFailKeyJ2 += (model + "_")
+
+            countModelBucket = finalData[model][detail["mutation"]].get("bucketJ_" + str(bucketJ), 0)
+            finalData[model][detail["mutation"]]["bucketJ_" + str(bucketJ)] = countModelBucket + 1
+
 
         # Final bucket data all and mutation
-        if bucketFailKey == "":
-            bucketFailKey = "none_"
-        bucketFailKey += "failed"
+        if bucketFailKeyA == "":
+            bucketFailKeyA = "none_"
+        bucketFailKeyA += "failed"
         
-        failureCountMutant = finalData[detail["mutation"]]["buckets"].get(bucketFailKey, 0)
-        finalData[detail["mutation"]]["buckets"][bucketFailKey] = failureCountMutant + 1
-        failureCountAll = finalData["buckets"].get(bucketFailKey, 0)
-        finalData["buckets"][bucketFailKey] = failureCountAll + 1
+        failureCountMutant = finalData[detail["mutation"]]["bucketsA"].get(bucketFailKeyA, 0)
+        finalData[detail["mutation"]]["bucketsA"][bucketFailKeyA] = failureCountMutant + 1
+        failureCountAll = finalData["bucketsA"].get(bucketFailKeyA, 0)
+        finalData["bucketsA"][bucketFailKeyA] = failureCountAll + 1
+
+        # Final bucket data all and mutation
+        if bucketFailKeyA2 == "":
+            bucketFailKeyA2 = "none_"
+        bucketFailKeyA2 += "failed"
+        
+        failureCountMutant = finalData[detail["mutation"]]["bucketsA2"].get(bucketFailKeyA2, 0)
+        finalData[detail["mutation"]]["bucketsA2"][bucketFailKeyA2] = failureCountMutant + 1
+        failureCountAll = finalData["bucketsA2"].get(bucketFailKeyA2, 0)
+        finalData["bucketsA2"][bucketFailKeyA2] = failureCountAll + 1
+
+        # Final bucket data all and mutation
+        if bucketFailKeyJ == "":
+            bucketFailKeyJ = "none_"
+        bucketFailKeyJ += "failed"
+        
+        failureCountMutant = finalData[detail["mutation"]]["bucketsJ"].get(bucketFailKeyJ, 0)
+        finalData[detail["mutation"]]["bucketsJ"][bucketFailKeyJ] = failureCountMutant + 1
+        failureCountAll = finalData["bucketsJ"].get(bucketFailKeyJ, 0)
+        finalData["bucketsJ"][bucketFailKeyJ] = failureCountAll + 1
+
+        # Final bucket data all and mutation
+        if bucketFailKeyJ2 == "":
+            bucketFailKeyJ2 = "none_"
+        bucketFailKeyJ2 += "failed"
+        
+        failureCountMutant = finalData[detail["mutation"]]["bucketsJ2"].get(bucketFailKeyJ2, 0)
+        finalData[detail["mutation"]]["bucketsJ2"][bucketFailKeyJ2] = failureCountMutant + 1
+        failureCountAll = finalData["bucketsJ2"].get(bucketFailKeyJ2, 0)
+        finalData["bucketsJ2"][bucketFailKeyJ2] = failureCountAll + 1
 
 
     # Remove bin / labels that are not within the top 5

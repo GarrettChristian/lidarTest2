@@ -29,10 +29,10 @@ vis = None
 
 color_map_alt = { # bgr
   0 : [0, 0, 0],
-  1 : [0, 0, 255],
+  1 : [0, 0, 0],
   10: [245, 150, 100],
   11: [245, 230, 100],
-  13: [250, 80, 100],
+  13: [250, 0, 0],
   15: [150, 60, 30],
   16: [255, 0, 0],
   18: [180, 30, 80],
@@ -46,26 +46,23 @@ color_map_alt = { # bgr
   49: [75, 0, 175],
   50: [0, 200, 255],
   51: [50, 120, 255],
-  52: [0, 150, 255],
-  60: [170, 255, 150],
+  52: [0, 0, 0],
+  60: [255, 0, 255],
   70: [0, 175, 0],
   71: [0, 60, 135],
   72: [80, 240, 150],
   80: [150, 240, 255],
   81: [0, 0, 255],
-  99: [255, 255, 50],
+  99: [0, 0, 0],
   252: [245, 150, 100],
-  256: [255, 0, 0],
   253: [200, 40, 255],
   254: [30, 30, 255],
   255: [90, 30, 150],
-  257: [250, 80, 100],
+  256: [255, 0, 0],
+  257: [250, 0, 0],
   258: [180, 30, 80],
   259: [255, 0, 0],
 }
-
-
-
 
 
 """
@@ -164,6 +161,34 @@ def handleOne(mutation, mutationId):
     # Get the mutation data
     item = mutationCollection.find_one({ "_id" : mutationId })
 
+
+    # Intensity Version
+    scan.setIntensityColorType(True)
+
+    # og-id : original scan with original labels
+    origScanIntensity = saveDir + "actual-og-intensity-" + mutationId + ".png"
+    vis.set_new_pcd(scan_name=dataDir + item["baseSequence"] + "/velodyne/" + item["baseScene"] + ".bin",
+                    label_name=dataDir + item["baseSequence"] + "/labels/" + item["baseScene"] + ".label")
+    vis.save(origScanIntensity)
+
+    # new-id : new scan with new labels
+    newScanIntensity = saveDir + "actual-new-intensity" + mutationId + ".png"
+    vis.set_new_pcd(scan_name=toolDir + "done/velodyne/" + mutationId + ".bin",
+                    label_name=toolDir + "done/labels/actual/" + mutationId + ".label")
+    vis.save(newScanIntensity)
+
+    ogImageIntensity = Image.open(origScanIntensity)
+    newImageIntensity = Image.open(newScanIntensity)
+    drawOgIntensity = ImageDraw.Draw(ogImageIntensity)
+    drawNewIntensity = ImageDraw.Draw(newImageIntensity)
+    drawOgIntensity.text((0, 0), "Orig Int", (255,255,255), font=font)
+    drawNewIntensity.text((0, 0), "New Int", (255,255,255), font=font)
+    imgs.append(np.asarray(ogImageIntensity))
+    imgs.append(np.asarray(newImageIntensity))
+
+    # Semanitc version 
+    scan.setIntensityColorType(False)
+
     # og-id : original scan with original labels
     origScan = saveDir + "actual-og-" + mutationId + ".png"
     vis.set_new_pcd(scan_name=dataDir + item["baseSequence"] + "/velodyne/" + item["baseScene"] + ".bin",
@@ -180,10 +205,10 @@ def handleOne(mutation, mutationId):
     newImage = Image.open(newScan)
     drawOg = ImageDraw.Draw(ogImage)
     drawNew = ImageDraw.Draw(newImage)
-    drawOg.text((0, 0), "Base Orig", (255,255,255), font=font)
-    drawNew.text((0, 0), "Base New", (255,255,255), font=font)
-    imgs.append(ogImage)
-    imgs.append(newImage)
+    drawOg.text((0, 0), "Orig Sem", (255,255,255), font=font)
+    drawNew.text((0, 0), "New Sem", (255,255,255), font=font)
+    imgs.append(np.asarray(ogImage))
+    imgs.append(np.asarray(newImage))
 
 
     for model in models:
@@ -197,8 +222,8 @@ def handleOne(mutation, mutationId):
 
             assetModelImage = Image.open(ogModelAssetSave)
             drawAsset = ImageDraw.Draw(assetModelImage)
-            drawAsset.text((0, 0), model + " Asset", (255,255,255), font=font)
-            imgs.append(assetModelImage)
+            drawAsset.text((0, 0), "Asset " + model, (255,255,255), font=font)
+            imgs.append(np.asarray(assetModelImage))
 
         # og-model-id : original scan with model labels (x3)
         ogModelSave = saveDir + model + "-og-" + mutationId + ".png"
@@ -208,8 +233,8 @@ def handleOne(mutation, mutationId):
 
         ogModelImage = Image.open(ogModelSave)
         drawOg = ImageDraw.Draw(ogModelImage)
-        drawOg.text((0, 0), model + " Orig", (255,255,255), font=font)
-        imgs.append(ogModelImage)
+        drawOg.text((0, 0), "Orig " + model, (255,255,255), font=font)
+        imgs.append(np.asarray(ogModelImage))
 
         # new-model-id : new scan with model labels (x3)
         newModelSave = saveDir + model + "-new-" + mutationId + ".png"
@@ -219,15 +244,15 @@ def handleOne(mutation, mutationId):
         
         newModelImage = Image.open(newModelSave)        
         drawNew = ImageDraw.Draw(newModelImage)        
-        drawNew.text((0, 0), model + " New", (255,255,255), font=font)
-        imgs.append(newModelImage)
+        drawNew.text((0, 0), "New " + model, (255,255,255), font=font)
+        imgs.append(np.asarray(newModelImage))
 
 
   
     # Combine into one image
     # https://stackoverflow.com/questions/30227466/combine-several-images-horizontally-with-python
     combineSave = finalVisDir + "/" + mutation + "/" + mutationId + ".png"
-    imgsComb = np.vstack( (np.asarray(i) for i in imgs ) )
+    imgsComb = np.vstack( imgs )
     imgsComb = Image.fromarray(imgsComb)
     imgsComb.save(combineSave)
 

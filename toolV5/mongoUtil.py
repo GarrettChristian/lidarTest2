@@ -3,7 +3,7 @@ from pymongo import MongoClient
 
 
 import globals
-from fileIoUtil import openLabelBin
+import fileIoUtil
 import numpy as np
 import os
 import json
@@ -33,8 +33,8 @@ def mongoConnect():
     client = MongoClient(mongoUrl)
     db = client["lidar_data"]
     
-    assetCollection = db["assets2"]
-    assetMetadataCollection = db["asset_metadata2"]
+    assetCollection = db["assets3"]
+    assetMetadataCollection = db["asset_metadata3"]
     mutationCollection = db["mutations"]
     accuracyCollection = db["base_accuracy"]
 
@@ -48,7 +48,7 @@ def getInstanceFromAssetRecord(assetRecord):
     sequence = assetRecord["sequence"]
     scene = assetRecord["scene"]
 
-    pcdArr, intensity, semantics, labelInstance = openLabelBin(globals.path, sequence, scene)
+    pcdArr, intensity, semantics, labelInstance = fileIoUtil.openLabelBin(globals.pathVel, globals.pathLbl, sequence, scene)
 
     maskOnlyInst = (labelInstance == instance)
 

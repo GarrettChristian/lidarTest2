@@ -1,6 +1,5 @@
 
 
-
 import numpy as np
 import open3d as o3d
 import math
@@ -129,12 +128,13 @@ def rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, details):
             
         rotateDeg = globals.rotation
         if (not rotateDeg):
-            modifier = random.randint(-4, 4)
-            rotateDeg = random.choice(degrees) + modifier
-            if rotateDeg < 0:
-                rotateDeg = 0
-            elif rotateDeg > 360:
-                rotateDeg = 360
+            # modifier = random.randint(-4, 4)
+            # rotateDeg = random.choice(degrees) + modifier
+            # if rotateDeg < 0:
+            #     rotateDeg = 0
+            # elif rotateDeg > 360:
+            #     rotateDeg = 360
+            rotateDeg = random.choice(degrees) 
         print(rotateDeg)
         details['rotate'] = rotateDeg
 
@@ -158,10 +158,16 @@ def rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, details):
         # o3d.visualization.draw_geometries([hull_ls, pcdScene])
         
 
-        print("Check on Road")
-        success = pointsAboveGround(pcdArrAssetNew, pcdArr, semantics) or pointsWithinDist(pcdArrAssetNew) 
+        print("Check on ground")
+        maskGround = (semantics == 40) | (semantics == 44) | (semantics == 48) | (semantics == 49) | (semantics == 60) | (semantics == 72)
+        if (details["assetType"] == "traffic-sign"):
+            maskGround = (semantics == 44) | (semantics == 48) | (semantics == 49) | (semantics == 60) | (semantics == 72)
+            success = pointsAboveGround(pcdArrAssetNew, pcdArr, maskGround) 
+        else:
+            success = pointsAboveGround(pcdArrAssetNew, pcdArr, maskGround) or pointsWithinDist(pcdArrAssetNew) 
+
         if (success):
-            print("On Road")
+            print("On correct ground")
 
             print("align to Z dim")
             pcdArrAssetNew = alignZdim(pcdArrAssetNew, pcdArr, semantics)
@@ -270,9 +276,9 @@ def checkInclusionBasedOnTriangleMeshAsset(points, mesh):
 """
 Checks that all points exist above the ground
 """
-def pointsAboveGround(points, scene, semantics):
+def pointsAboveGround(points, scene, maskGround):
     
-    maskGround = (semantics == 40) | (semantics == 44) | (semantics == 48) | (semantics == 49) | (semantics == 60) | (semantics == 72)
+    
     pcdArrGround = scene[maskGround, :]
 
     # Remove Z dim
@@ -509,7 +515,7 @@ def getLidarShadowMesh(asset):
 Removes the LiDAR shadow by casting lines based on the hull of the asset
 Then deleteing if the points are found within the polygon
 """
-def removeLidarShadow(asset, scene, intensity, semantics, labelsInstance):
+def removeLidarShadow(asset, scene, intensity, semantics, instances):
 
     cutPointsHull = getLidarShadowMesh(asset)
 
@@ -519,9 +525,9 @@ def removeLidarShadow(asset, scene, intensity, semantics, labelsInstance):
     sceneResult = scene[mask, :]
     intensityResult = intensity[mask]
     semanticsResult = semantics[mask]
-    labelsInstanceResult = labelsInstance[mask]
+    instancesResult = instances[mask]
 
-    return (sceneResult, intensityResult, semanticsResult, labelsInstanceResult)
+    return (sceneResult, intensityResult, semanticsResult, instancesResult)
 
 
 # https://stackoverflow.com/questions/3306838/algorithm-for-reflecting-a-point-across-a-line
@@ -570,7 +576,7 @@ def isLeft(a, b, c):
 Removes the LiDAR shadow by casting lines based on the hull of the asset
 Then deleteing if the points are found within the polygon
 """
-def replaceBasedOnShadow(asset, scene, intensity, semantics, labelsInstance):
+def replaceBasedOnShadow(asset, scene, intensity, semantics, instances):
 
     shadow = getLidarShadowMesh(asset)
     shadowVertices = np.asarray(shadow.vertices)
@@ -702,15 +708,17 @@ def replaceBasedOnShadow(asset, scene, intensity, semantics, labelsInstance):
         angleRight = angleRight * -1
     angleRight = 360 - angleRight
 
-    if (len(replaceLeftShadow) > 0):
+    if (len(replaceLeftShadow) > 4):
         replaceLeftShadow = rotatePoints(replaceLeftShadow, angleRight)
     else:
-        print("left shadow empty")
+        print("Left shadow empty {}".format(len(replaceLeftShadow)))
+        return False, None, None, None, None
     
-    if (len(replaceRightShadow) > 0):
+    if (len(replaceRightShadow) > 4):
         replaceRightShadow = rotatePoints(replaceRightShadow, angleLeft)
     else:
-        print("right shadow empty")
+        print("Right shadow empty {}".format(len(replaceRightShadow)))
+        return False, None, None, None, None
 
     pcdCastHull = o3d.geometry.PointCloud()
     pcdCastHull.points = o3d.utility.Vector3dVector(replaceLeftShadow)
@@ -726,13 +734,13 @@ def replaceBasedOnShadow(asset, scene, intensity, semantics, labelsInstance):
     pcdIncluded = scene[maskIncluded]
     intensityIncluded = intensity[maskIncluded]
     semanticsIncluded = semantics[maskIncluded]
-    labelsInstanceIncluded = labelsInstance[maskIncluded]
+    instancesIncluded = instances[maskIncluded]
 
     maskIncluded2 = checkInclusionBasedOnTriangleMesh(scene, shadowRotated2)
     pcdIncluded2 = scene[maskIncluded2]
     intensityIncluded2 = intensity[maskIncluded2]
     semanticsIncluded2 = semantics[maskIncluded2]
-    labelsInstanceIncluded2 = labelsInstance[maskIncluded2]
+    instancesIncluded2 = instances[maskIncluded2]
 
 
 
@@ -763,8 +771,8 @@ def replaceBasedOnShadow(asset, scene, intensity, semantics, labelsInstance):
         print("right points empty")
 
 
-    pcdIncluded, intensityIncluded, semanticsIncluded, labelsInstanceIncluded = combine(pcdIncluded, intensityIncluded, semanticsIncluded, labelsInstanceIncluded,
-        pcdIncluded2, intensityIncluded2, semanticsIncluded2, labelsInstanceIncluded2)
+    pcdIncluded, intensityIncluded, semanticsIncluded, instancesIncluded = combine(pcdIncluded, intensityIncluded, semanticsIncluded, instancesIncluded,
+        pcdIncluded2, intensityIncluded2, semanticsIncluded2, instancesIncluded2)
 
 
     # maskGround = (semanticsIncluded == 40) | (semanticsIncluded == 44) | (semanticsIncluded == 48) | (semanticsIncluded == 49) | (semanticsIncluded == 60) | (semanticsIncluded == 72)
@@ -777,7 +785,7 @@ def replaceBasedOnShadow(asset, scene, intensity, semantics, labelsInstance):
     #     pcdIncluded = scene[maskIncluded2]
     #     intensityIncluded = intensity[maskIncluded2]
     #     semanticsIncluded = semantics[maskIncluded2]
-    #     labelsInstanceIncluded = labelsInstance[maskIncluded2]
+    #     instancesIncluded = instances[maskIncluded2]
     #     m = mMax
     #     c = cMax
 
@@ -815,12 +823,12 @@ def replaceBasedOnShadow(asset, scene, intensity, semantics, labelsInstance):
     
 
 
-    sceneReplace, intensityReplace, semanticsReplace, labelsInstanceReplace = combine(pcdIncluded, intensityIncluded, semanticsIncluded, labelsInstanceIncluded,
-        scene, intensity, semantics, labelsInstance)
+    sceneReplace, intensityReplace, semanticsReplace, instancesReplace = combine(pcdIncluded, intensityIncluded, semanticsIncluded, instancesIncluded,
+        scene, intensity, semantics, instances)
 
 
 
-    return True, sceneReplace, intensityReplace, semanticsReplace, labelsInstanceReplace
+    return True, sceneReplace, intensityReplace, semanticsReplace, instancesReplace
 
 
 def removeCenterPoints(points):
@@ -855,50 +863,52 @@ def pointInTriangle (p0, p1, p2, point):
     return s > 0 and t > 0 and ((1 - s) - t) > 0
 
 
-def getValidRotations(points, scene, semantics):
+# def getValidRotations(points, scene, semantics):
 
-    # Remove the road
-    maskNotGround = (semantics != 40) & (semantics != 44) & (semantics != 48) & (semantics != 49) & (semantics != 60) & (semantics != 72)
-    pcdArrExceptGround = scene[maskNotGround, :]
+#     # Remove the road
+#     # maskNotGround = (semantics != 40) & (semantics != 44) & (semantics != 48) & (semantics != 49) & (semantics != 60) & (semantics != 72)
+#     maskNotGround = (semantics != 0) & (semantics != 1) & (semantics != 40) & (semantics != 44) & (semantics != 48) & (semantics != 49) & (semantics != 60) & (semantics != 72)
+#     pcdArrExceptGround = scene[maskNotGround, :]
 
-    # Ignore anything in center
-    pcdArrExceptGround[:, Z_AXIS] = 0
-    sceneWithoutCenter = removeCenterPoints(pcdArrExceptGround)
+#     # Ignore anything in center
+#     pcdArrExceptGround[:, Z_AXIS] = 0
+#     # sceneWithoutCenter = removeCenterPoints(pcdArrExceptGround)
     
-    # Create a set of unique points
-    uniquePoints = set()
-    for point in sceneWithoutCenter:
-        pt = (point[X_AXIS], point[Y_AXIS])
-        uniquePoints.add(pt)
+#     # Create a set of unique points
+#     uniquePoints = set()
+#     # for point in sceneWithoutCenter:
+#     for point in pcdArrExceptGround:
+#         pt = (point[X_AXIS], point[Y_AXIS])
+#         uniquePoints.add(pt)
 
-    #  Get the asset's bounding box
-    pcdAsset = o3d.geometry.PointCloud()
-    pcdAsset.points = o3d.utility.Vector3dVector(points)
-    obb = pcdAsset.get_oriented_bounding_box()
+#     #  Get the asset's bounding box
+#     pcdAsset = o3d.geometry.PointCloud()
+#     pcdAsset.points = o3d.utility.Vector3dVector(points)
+#     obb = pcdAsset.get_oriented_bounding_box()
 
-    # Create a triangle from the oriented box    
-    minBox = obb.get_min_bound()
-    maxBox = obb.get_max_bound()
-    triangle = np.asarray([centerCamPoint, maxBox, minBox])
+#     # Create a triangle from the oriented box    
+#     minBox = obb.get_min_bound()
+#     maxBox = obb.get_max_bound()
+#     triangle = np.asarray([centerCamPoint, maxBox, minBox])
     
-    degrees = []
+#     degrees = []
 
-    for deg in range(0, 360, 5):
-        triangleRotated = rotatePoints(triangle, deg)
+#     for deg in range(0, 360, 5):
+#         triangleRotated = rotatePoints(triangle, deg)
 
-        p0 = (triangleRotated[0][X_AXIS], triangleRotated[0][Y_AXIS])
-        p1 = (triangleRotated[1][X_AXIS], triangleRotated[1][Y_AXIS])
-        p2 = (triangleRotated[2][X_AXIS], triangleRotated[2][Y_AXIS])
+#         p0 = (triangleRotated[0][X_AXIS], triangleRotated[0][Y_AXIS])
+#         p1 = (triangleRotated[1][X_AXIS], triangleRotated[1][Y_AXIS])
+#         p2 = (triangleRotated[2][X_AXIS], triangleRotated[2][Y_AXIS])
 
-        empty = True
-        for point in uniquePoints:
-            # print(point)
-            empty = empty and not pointInTriangle(p0, p1, p2, point)
+#         empty = True
+#         for point in uniquePoints:
+#             # print(point)
+#             empty = empty and not pointInTriangle(p0, p1, p2, point)
         
-        if (empty): 
-            degrees.append(deg)
+#         if (empty): 
+#             degrees.append(deg)
             
-    return degrees
+#     return degrees
 
 
 
@@ -1022,7 +1032,6 @@ def closestBoundingTwo(min, max, asset):
 
 def createStopSign(center):
     
-
     box = o3d.geometry.TriangleMesh.create_box(width=0.05, height=0.75, depth=0.30)
     box2 = o3d.geometry.TriangleMesh.create_box(width=0.05, height=0.30, depth=0.75)
 
@@ -1040,15 +1049,50 @@ def createStopSign(center):
     return sign
 
 
+def createCrossbuck(center):
+    
+    box = o3d.geometry.TriangleMesh.create_box(width=0.05, height=0.22, depth=1.22)
+    box2 = o3d.geometry.TriangleMesh.create_box(width=0.05, height=1.22, depth=0.22)
 
-def getSignAsset(scene, intensity, semantics, labelsInstance):
+    box.translate(center, relative=False)
+    box2.translate(center, relative=False)
+
+    box += box2
+
+    rotation2 = box.get_rotation_matrix_from_xyz((45, 0, 0))
+    box.rotate(rotation2, center=box.get_center())
+
+    return box
+
+
+def createYeild():
+    
+    yeildPoints = np.array([[0, -0.455, 0.91], 
+                            [0, 0, 0.91], 
+                            [0, 0.455, 0.91], 
+                            [0, 0, 0],
+                            [0.05, -0.455, 0.91], 
+                            [0.05, 0, 0.91], 
+                            [0.05, 0.455, 0.91], 
+                            [0.05, 0, 0]])
+
+    pcdSign = o3d.geometry.PointCloud()
+    pcdSign.points = o3d.utility.Vector3dVector(yeildPoints)
+
+    #  Get the asset's hull mesh
+    sign, _ = pcdSign.compute_convex_hull()
+
+    return sign
+
+
+def getSignAsset(scene, intensity, semantics, instances):
     
     maskSign = (semantics == 81)
 
     onlySigns = scene[maskSign, :]
     intensitySigns = intensity[maskSign]
     semanticsSigns = semantics[maskSign]
-    labelsInstanceSigns = labelsInstance[maskSign]
+    instancesSigns = instances[maskSign]
 
     # Check that there are signs 
     if (np.shape(onlySigns)[0] < 1):
@@ -1073,15 +1117,15 @@ def getSignAsset(scene, intensity, semantics, labelsInstance):
     oneSign = onlySigns[labels == signIndex, :]
     intensitySign = intensitySigns[labels == signIndex]
     semanticsSign = semanticsSigns[labels == signIndex]
-    labelsInstanceSign= labelsInstanceSigns[labels == signIndex]
+    instancesSign= instancesSigns[labels == signIndex]
 
-    return True, oneSign, intensitySign, semanticsSign, labelsInstanceSign
+    return True, oneSign, intensitySign, semanticsSign, instancesSign
 
 
 def pointsToMesh(mesh, assetData, sceneData):
 
-    asset, intensityAsset, semanticsAsset, labelsInstanceAsset = assetData
-    scene, intensity, semantics, labelsInstance = sceneData
+    asset, intensityAsset, semanticsAsset, instancesAsset = assetData
+    scene, intensity, semantics, instances = sceneData
 
     # http://www.open3d.org/docs/latest/tutorial/geometry/ray_casting.html
     # Calulate intersection for scene to mesh points
@@ -1105,12 +1149,12 @@ def pointsToMesh(mesh, assetData, sceneData):
     # Split between intersect and non intersect
     intensityIntersect = intensity[hit.numpy()]
     semanticsIntersect = semantics[hit.numpy()]
-    labelsInstanceIntersect = labelsInstance[hit.numpy()]
+    instancesIntersect = instances[hit.numpy()]
     nonHit = np.logical_not(hit.numpy())
     sceneNonIntersect = scene[nonHit]
     intensityNonIntersect = intensity[nonHit]
     semanticsNonIntersect = semantics[nonHit]
-    labelsInstanceNonIntersect = labelsInstance[nonHit]
+    instancesNonIntersect = instances[nonHit]
     
     newAssetScene = []
     for vector in pointsOnMesh:
@@ -1132,7 +1176,7 @@ def pointsToMesh(mesh, assetData, sceneData):
     
     intensityAsset = intensityAsset[hit.numpy()] 
     semanticsAsset = semanticsAsset[hit.numpy()]
-    labelsInstanceAsset = labelsInstanceAsset[hit.numpy()]
+    instancesAsset = instancesAsset[hit.numpy()]
 
     print(len(newAsset))
     print(len(newAssetScene))
@@ -1149,40 +1193,96 @@ def pointsToMesh(mesh, assetData, sceneData):
         [k, idx, _] = pcd_tree.search_knn_vector_3d(point, 1)
         intensityIntersect[pointIndex] = intensityAsset[idx]
         semanticsIntersect[pointIndex] = semanticsAsset[idx]
-        labelsInstanceIntersect[pointIndex] = labelsInstanceAsset[idx]
+        instancesIntersect[pointIndex] = instancesAsset[idx]
 
-    newAsset, intensityAsset, semanticsAsset, labelsInstanceAsset = combine(newAsset, intensityAsset, semanticsAsset, labelsInstanceAsset, 
-                                                                    newAssetScene, intensityIntersect, semanticsIntersect, labelsInstanceIntersect)
+    newAsset, intensityAsset, semanticsAsset, instancesAsset = combine(newAsset, intensityAsset, semanticsAsset, instancesAsset, 
+                                                                    newAssetScene, intensityIntersect, semanticsIntersect, instancesIntersect)
 
     # Return revised scene
-    newAssetData = (newAsset, intensityAsset, semanticsAsset, labelsInstanceAsset)
-    newSceneData = (sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, labelsInstanceNonIntersect)
+    newAssetData = (newAsset, intensityAsset, semanticsAsset, instancesAsset)
+    newSceneData = (sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, instancesNonIntersect)
     return True, newAssetData, newSceneData
 
 
-def signReplace(sign, intensitySign, semanticsSign, labelsInstanceSign, scene, intensity, semantics, labelsInstance, details):
+def signReplace(signAsset, intensityAsset, semanticsAsset, instancesAsset, scene, intensity, semantics, instances, details):
+
+    pole = signAsset[semanticsAsset == 80]
+    intensityPole = intensityAsset[semanticsAsset == 80]
+    semanticsPole = semanticsAsset[semanticsAsset == 80]
+    instancesPole = instancesAsset[semanticsAsset == 80]
+    sign = signAsset[semanticsAsset == 81]
+    intensitySign = intensityAsset[semanticsAsset == 81]
+    semanticsSign = semanticsAsset[semanticsAsset == 81]
+    instancesSign = instancesAsset[semanticsAsset == 81]
+
+    if (np.shape(pole)[0] < 5 or np.shape(sign)[0] < 5):
+        print("Sign {} pole {}, too little points".format(np.shape(sign)[0], np.shape(pole)[0]))
+        return False, None, None, None, None, None, None, None, None, details
     
     # Get bounds to align the sign to 
     print(np.shape(sign))
     pcdSign = o3d.geometry.PointCloud()
     pcdSign.points = o3d.utility.Vector3dVector(sign)
-    obb = pcdSign.get_oriented_bounding_box()
-    signCenter = obb.get_center()
-    minSign, _ = closestBoundingTwo(obb.get_min_bound(), obb.get_max_bound(), sign)
+    signBox = pcdSign.get_oriented_bounding_box()
+
+    pcdPole = o3d.geometry.PointCloud()
+    pcdPole.points = o3d.utility.Vector3dVector(pole)
+    poleBox = pcdPole.get_oriented_bounding_box()
+    signCenter = poleBox.get_center()
+    
+    minSign, maxSign = closestBoundingTwo(signBox.get_min_bound(), signBox.get_max_bound(), sign)
+
+    minZSign = sys.maxsize
+    for point in sign:
+        minZSign = min(minZSign, point[2])
+
+    maxSign[2] = minZSign
+    minSign[2] = minZSign
+    signCenter[2] = minZSign
+    signLen = np.linalg.norm(maxSign - minSign)
 
     # Create shape mesh
     signMesh = None
-    signType = random.randint(0, 1)
+    signType = random.randint(0, 5)
     if (signType == 0):
         signMesh = o3d.geometry.TriangleMesh.create_box(width=0.05, height=0.6, depth=0.75)
         details["sign"] = "speed"
+    elif (signType == 1):
+        signMesh = createCrossbuck(signCenter)
+        details["sign"] = "crossbuck"
+    elif (signType == 2):
+        signMesh = createYeild()
+        details["sign"] = "yeild"
+    elif (signType == 3):
+        signMesh = o3d.geometry.TriangleMesh.create_box(width=0.05, height=0.76, depth=0.76)    
+        rotation = signMesh.get_rotation_matrix_from_xyz((45, 0, 0))
+        signMesh.rotate(rotation, center=signMesh.get_center())
+        details["sign"] = "warning"
     else:
         signMesh = createStopSign(signCenter)
         details["sign"] = "stop"
 
-    # Move the mesh to the 
+
+    meshMin = signMesh.get_min_bound()
+    meshMax = signMesh.get_max_bound()
+    heightMesh = meshMax[2] - meshMin[2]
+    meshMax[2] = minZSign
+    meshMin[2] = minZSign
+    meshLen = np.linalg.norm(meshMin - meshMin)
+
+    if (minZSign < -1):
+        print("Sign too low min {}".format(minZSign))
+        return False, None, None, None, None, None, None, None, None, details
+
+    if (np.absolute(meshLen - signLen) > 2):
+        print("Distance to sign too great: mesh len {}, sign len {}".format(meshLen, signLen))
+        return False, None, None, None, None, None, None, None, None, details
+
+
+    # Move the mesh to the center of the based on pole center, sign min, and height of the sign
+    signCenter[2] = minZSign + (heightMesh / 2) 
     signMesh.translate(signCenter, relative=False)
-    angleSign = getAngleRadians(obb.get_center(), minSign, signMesh.get_min_bound())
+    angleSign = getAngleRadians(signCenter, minSign, signMesh.get_min_bound())
 
     # Get two rotation options
     rotation = signMesh.get_rotation_matrix_from_xyz((0, 0, angleSign * -1))
@@ -1201,18 +1301,30 @@ def signReplace(sign, intensitySign, semanticsSign, labelsInstanceSign, scene, i
         signMesh = signMeshRotate2
 
 
+    
+
+    # Add the pole points to the scene
+    scene, intensity, semantics, instances = combine(scene, intensity, semantics, instances, 
+                                                    pole, intensityPole, semanticsPole, instancesPole)
+
+
     # Pull the points to the mesh
-    assetData = (sign, intensitySign, semanticsSign, labelsInstanceSign)
-    sceneData = (scene, intensity, semantics, labelsInstance)
+    assetData = (sign, intensitySign, semanticsSign, instancesSign)
+    sceneData = (scene, intensity, semantics, instances)
     success, newAssetData, newSceneData = pointsToMesh(signMesh, assetData, sceneData)
 
-    sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, labelsInstanceNonIntersect = newSceneData
-    sign, intensitySign, semanticsSign, labelsInstanceSign = newAssetData
-    return success, sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, labelsInstanceNonIntersect, sign, intensitySign, semanticsSign, labelsInstanceSign, details
+    sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, instancesNonIntersect = newSceneData
+    sign, intensitySign, semanticsSign, instancesSign = newAssetData
+
+    if (success and np.shape(sign)[0] < 20):
+        print("Sign too little points")
+        success = False
+
+    return success, sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, instancesNonIntersect, sign, intensitySign, semanticsSign, instancesSign, details
 
 
-def scaleVehicle(asset, intensityAsset, semanticsAsset, labelsInstanceAsset, 
-                scene, intensity, semantics, labelsInstance, details):
+def scaleVehicle(asset, intensityAsset, semanticsAsset, instancesAsset, 
+                scene, intensity, semantics, instances, details):
 
 
     # Prepare to create the mesh estimating normals
@@ -1222,55 +1334,189 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, labelsInstanceAsset,
     pcdAsset.orient_normals_towards_camera_location()
 
     # Create a mesh using the ball pivoting method
-    radii = [0.15, 0.15, 0.15, 0.15]
-    mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(pcdAsset, o3d.utility.DoubleVector(radii))
+    mesh = None
+    if (np.shape(asset)[0] < 5000):
+        radii = [0.15, 0.15, 0.15, 0.15]
+        mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(pcdAsset, o3d.utility.DoubleVector(radii))
+    else:
+        mesh, _ = pcdAsset.compute_convex_hull()
 
     # Check that the mesh is valid
     if (np.shape(np.array(mesh.vertices))[0] < 1 or np.shape(np.array(mesh.triangles))[0] < 1):
         print("MESH NOT SUFFICENT: Vertices {} Triangles {}".format(np.shape(np.array(mesh.vertices))[0], np.shape(np.array(mesh.triangles))[0]))
         return False, None, None, None, None, None, None, None, None, None
     
-    # Scale the vehicle
+    # Scale the vehicle mesh
     scale = random.uniform(1.01, 1.05)
-    mesh.scale(scale, center=mesh.get_center())
     details["scale"] = scale
+    mesh.scale(scale, center=mesh.get_center())
 
-    # Prepare the shadow of the new mesh to see what is included
-    # shadow = getLidarShadowMesh(np.array(mesh.vertices))
-    # sceneMask = checkInclusionBasedOnTriangleMesh(scene, shadow)
+    # Scale the points
+    scaledPoints = copy.deepcopy(pcdAsset).scale(scale, center=mesh.get_center())
+
+
+    # http://www.open3d.org/docs/latest/tutorial/geometry/ray_casting.html
+    # Calulate intersection for scene to mesh points
+    legacyMesh = o3d.t.geometry.TriangleMesh.from_legacy(mesh)
+    sceneRays = o3d.t.geometry.RaycastingScene()
+    sceneRays.add_triangles(legacyMesh)
+
+    if (np.shape(scene)[0] < 1 or np.shape(asset)[0] < 1):
+        print("SCENE or ASSET PROVIDED EMPTY: SCENE {}, ASSET {}".format(np.shape(scene)[0], np.shape(asset)[0]))
+        return False, None, None, None, None, None, None, None, None, None
+
+    raysVectorsScene = []
+    for point in scene:
+        raysVectorsScene.append([0, 0, 0, point[0], point[1], point[2]])
+
+    rays = o3d.core.Tensor(raysVectorsScene, dtype=o3d.core.Dtype.Float32)
+    ans = sceneRays.cast_rays(rays)
+    hit = ans['t_hit'].isfinite()
+    pointsOnMesh = rays[hit][:,:3] + rays[hit][:,3:]*ans['t_hit'][hit].reshape((-1,1))
+
+    # Split between intersect and non intersect
+    intensityIntersect = intensity[hit.numpy()]
+    semanticsIntersect = semantics[hit.numpy()]
+    instancesIntersect = instances[hit.numpy()]
+    nonHit = np.logical_not(hit.numpy())
+    sceneNonIntersect = scene[nonHit]
+    intensityNonIntersect = intensity[nonHit]
+    semanticsNonIntersect = semantics[nonHit]
+    instancesNonIntersect = instances[nonHit]
     
-    # # Included in shadow
-    # sceneIncluded = scene[sceneMask]
-    # intensityIncluded = intensity[sceneMask]
-    # semanticsIncluded = semantics[sceneMask]
-    # labelsInstanceIncluded = labelsInstance[sceneMask]
+    newAssetScene = []
+    for vector in pointsOnMesh:
+        newAssetScene.append(vector.numpy())
 
-    # # Not Included in the shadow
-    # sceneMaskNot = np.logical_not(sceneMask)
-    # sceneNotIncluded = scene[sceneMaskNot]
-    # intensityNotIncluded = intensity[sceneMaskNot]
-    # semanticsNotIncluded = semantics[sceneMaskNot]
-    # labelsInstanceNotIncluded = labelsInstance[sceneMaskNot]
+    # Calulate intersection for sign points
+    raysVectorsMesh = []
+    for point in asset:
+        raysVectorsMesh.append([0, 0, 0, point[0], point[1], point[2]])
 
+    rays = o3d.core.Tensor(raysVectorsMesh, dtype=o3d.core.Dtype.Float32)
+    ans = sceneRays.cast_rays(rays)
+    hit = ans['t_hit'].isfinite()
+    pointsOnMesh = rays[hit][:,:3] + rays[hit][:,3:]*ans['t_hit'][hit].reshape((-1,1))
+
+    newAsset = []
+    for vector in pointsOnMesh:
+        newAsset.append(vector.numpy())
     
+    newIntensityAsset = intensityAsset[hit.numpy()] 
+    newSemanticsAsset = semanticsAsset[hit.numpy()]
+    newInstancesAsset = instancesAsset[hit.numpy()]
 
-    # Prepare the mesh for ray casting to move points to mesh
-    assetData = (asset, intensityAsset, semanticsAsset, labelsInstanceAsset)
-    sceneIncludedData = (scene, intensity, semantics, labelsInstance)
-    success, newAssetData, newSceneData = pointsToMesh(mesh, assetData, sceneIncludedData)    
+    print(len(newAsset))
+    print(len(newAssetScene))
 
-    newAsset, newIntensityAsset, newSemanticsAsset, newLabelsInstanceAsset = newAssetData
-    newScene, newIntensity, newSemantics, newLabelsInstance = newSceneData
+    if len(newAsset) == 0 or len(newAssetScene) == 0:
+        print("GOT NONE OF THE OG ASSET {} OR NONE OF SCENE {}".format(len(newAsset), len(newAssetScene)))
+        return False, None, None, None, None, None, None, None, None, None
+
+    # Fix the intensity of each of the points in the scene that were pulled into the asset by using the closest scaled asset point
+    pcd_tree = o3d.geometry.KDTreeFlann(scaledPoints)
+    for pointIndex in range(0, len(newAssetScene)):
+        [k, idx, _] = pcd_tree.search_knn_vector_3d(point, 1)
+        intensityIntersect[pointIndex] = intensityAsset[idx]
+        semanticsIntersect[pointIndex] = semanticsAsset[idx]
+        instancesIntersect[pointIndex] = instancesAsset[idx]
+
+    newAsset, intensityAsset, semanticsAsset, instancesAsset = combine(newAsset, newIntensityAsset, newSemanticsAsset, newInstancesAsset, 
+                                                                    newAssetScene, intensityIntersect, semanticsIntersect, instancesIntersect)
+
 
     # print(np.shape(newAsset))
-    if (success and np.shape(newAsset)[0] < 10):
-        success = False
-
-    # return success, sceneNotIncluded, intensityNotIncluded, semanticsNotIncluded, labelsInstanceNotIncluded, newAsset, newIntensityAsset, newSemanticsAsset, newLabelsInstanceAsset, details
-    return success, newScene, newIntensity, newSemantics, newLabelsInstance, newAsset, newIntensityAsset, newSemanticsAsset, newLabelsInstanceAsset, details
+    if (np.shape(newAsset)[0] < 20):
+        print("New asset too small {}".format(np.shape(newAsset)[0]))
+        return False, None, None, None, None, None, None, None, None, None
 
 
+    # Return revised scene
+    return True, newAsset, intensityAsset, semanticsAsset, instancesAsset, sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, instancesNonIntersect, details
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def getPointsOnLine(p1, p2, count):
+    x1 = p1[0]
+    x2 = p2[0]
+    y1 = p1[1]
+    y2 = p2[1]
+
+    m = (y2 - y1) / (x2 - x1)
+
+    b = y1 - (m * x1)
+
+    minX = min(x1, x2)
+    maxX = max(x1, x2)
+
+    xVals = []
+    yVals = []
+    step = abs((maxX - minX) / count)
+    curX = minX
+    while curX <= maxX:
+        y = m*curX + b
+
+        xVals.append(curX)
+        yVals.append(y)
+
+        curX += step
+
+    pointsOnLine = np.zeros((len(xVals), 3), dtype=np.float)
+    pointsOnLine[:, 0] = xVals
+    pointsOnLine[:, 1] = yVals
+
+    return pointsOnLine
+
+
+
+
+
+def getValidRotations(asset, scene, semantics):
+    
+    maskNotGround = (semantics != 0) & (semantics != 1) & (semantics != 40) & (semantics != 44) & (semantics != 48) & (semantics != 49) & (semantics != 60) & (semantics != 72)
+    scene = scene[maskNotGround]
+    scene[:, 2] = 0
+
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(scene)
+
+    #  Get the asset's bounding box
+    pcdAsset = o3d.geometry.PointCloud()
+    pcdAsset.points = o3d.utility.Vector3dVector(asset)
+    obb = pcdAsset.get_oriented_bounding_box()
+    assetCenter = obb.get_center() 
+
+    voxelGridWalls = o3d.geometry.VoxelGrid.create_from_point_cloud(pcd, voxel_size=1)
+
+    linePoints = getPointsOnLine((0, 0), assetCenter, 40)
+    degrees = []
+
+
+    # for deg in range(0, 360, 5):
+    for deg in range(0, 360):
+        lineRotated = rotatePoints(linePoints, deg)
+        
+        included = voxelGridWalls.check_if_included(o3d.utility.Vector3dVector(lineRotated))
+        included = np.logical_or.reduce(included, axis=0)
+        if (not included): 
+            degrees.append(deg)     
+
+
+    return degrees
 
