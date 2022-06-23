@@ -163,7 +163,7 @@ def performMutation():
                                                                                                                                                             pcdArr, intensity, semantics, instances, details) 
 
             elif (mutationSplit[mutationIndex] == "REMOVE"):
-                success, pcdArr, intensity, semantics, instances = pcdUtil.replaceBasedOnShadow(pcdArrAsset, pcdArr, intensity, semantics, instances)
+                success, pcdArr, intensity, semantics, instances = pcdUtil.replaceBasedOnShadow(pcdArrAsset, pcdArr, intensity, semantics, instances, details)
                 if mutationIndex + 1 == len(mutationSplit):
                     combine = False
 
@@ -207,7 +207,7 @@ def performMutation():
 
         # Color as intensity or label
         colors = np.zeros(np.shape(pcdArr), dtype=np.float64)
-        if ("INTENSITY" in mutationSet):
+        if ("INTENSITY" in mutationSet or "SCALE" in mutationSet):
             colors[:, 2] = intensity
         else:
             for semIdx in range(0, len(semantics)):
@@ -249,7 +249,10 @@ def runMutations(threadNum):
     ticAll = time.perf_counter()
 
 
-    for num in range (0, globals.iterationNum):
+    # for num in range (0, globals.iterationNum):
+    attemptedNum = 0
+    successNum = 0
+    while (successNum < globals.expectedNum):
 
         # Start timer for batch
         tic = time.perf_counter()
@@ -259,8 +262,11 @@ def runMutations(threadNum):
         labels = []
 
         # Mutate
-        for index in range(0, globals.batchNum):
-            print("\n\n{}".format((num * globals.batchNum) + index))
+        # for index in range(0, globals.batchNum):
+        batchCount = 0
+        while(batchCount < globals.batchNum and successNum < globals.expectedNum):
+            attemptedNum += 1
+            print("\n\nAttempt {}. [curr successful {}]".format(attemptedNum, successNum))
 
             success = False
             success, details, xyziFinal, labelFinal = performMutation()
@@ -273,6 +279,8 @@ def runMutations(threadNum):
             #     errors.append(e)
 
             if success:
+                batchCount += 1
+                successNum += 1
                 mutationDetails.append(details)
                 bins.append(xyziFinal)
                 labels.append(labelFinal)
@@ -292,12 +300,22 @@ def runMutations(threadNum):
         # Evaluate
         if (globals.evalMutationFlag):
             details = eval.evalBatch(threadNum, mutationDetails)
-
-            finalData = eval.finalDetails(details, finalData)
+            finalData = eval.updateFinalDetails(details, finalData)
 
         # Save details
         if (globals.saveMutationFlag):
-            mongoUtil.saveMutationDetails(mutationDetails)
+            detailsToSave = []
+            for detail in mutationDetails:
+                buckets = 0
+                for model in globals.models:
+                    buckets += detail[model]["bucketA"]
+                    buckets += detail[model]["bucketJ"]
+                        
+                if (buckets > 0):
+                    detailsToSave.append(detail)
+
+            if (len(detailsToSave) > 0):
+                mongoUtil.saveMutationDetails(detailsToSave)
 
 
         # End timer for batch
@@ -307,17 +325,24 @@ def runMutations(threadNum):
         print("Batch took {}".format(timeFormatted))
 
 
-    print()
-    print(json.dumps(finalData, indent=4))
-    print()
+    # Final Items
 
     # End timer
     tocAll = time.perf_counter()
     timeSeconds = tocAll - ticAll
     timeFormatted = formatSecondsToHhmmss(timeSeconds)
-    print("Ran for {}".format(timeFormatted))
     finalData["seconds"] = timeSeconds
     finalData["time"] = timeFormatted
+
+    if (globals.evalMutationFlag):
+        finalData = eval.finalizeFinalDetails(finalData, successNum, attemptedNum)
+        mongoUtil.saveFinalData(finalData)
+
+    # Output final data
+    print()
+    print(json.dumps(finalData, indent=4))
+    print()
+    print("Ran for {}".format(timeFormatted))
 
 
     # Save final data
@@ -325,7 +350,7 @@ def runMutations(threadNum):
         with open(globals.dataDir + '/finalData.json', 'w') as outfile:
             json.dump(finalData, outfile, indent=4, sort_keys=True)
 
-
+    # If caching errors
     for idx in range(0, len(errors)):
         print("\n")
         print("Error {}".format(idx))
@@ -368,8 +393,8 @@ def parse_args():
     p.add_argument("-b", 
         help="Batch to create before evaluating", 
         nargs='?', const=100, default=100)
-    p.add_argument("-i", 
-        help="Iteration of batches", 
+    p.add_argument("-count", 
+        help="The total number of valid mutations you would like to create", 
         nargs='?', const=1, default=1)
 
     p.add_argument('-vis', help='Visualize with Open3D',
@@ -381,7 +406,7 @@ def parse_args():
         action='store_false', default=True)
 
     p.add_argument("-assetId", 
-        help="Asset Identifier", 
+        help="Asset Identifier, optional forces the tool to choose one specific asset", 
         nargs='?', const=None, default=None)
         
     p.add_argument('-rotate', help='Value to rotate', required=False)

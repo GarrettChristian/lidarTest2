@@ -84,6 +84,7 @@ def deform(asset, details):
 
 def intensityChange(intensityAsset, type, details):
 
+    # Create a mask that represents the portion to change the intensity for
     mask = np.ones(np.shape(intensityAsset), dtype=bool)
 
     if (type in globals.vehicles):    
@@ -571,34 +572,51 @@ def isLeft(a, b, c):
 
 
 
+# https://math.stackexchange.com/questions/422602/convert-two-points-to-line-eq-ax-by-c-0
+# https://www.geeksforgeeks.org/perpendicular-distance-between-a-point-and-a-line-in-2-d/
+def perpDistToLine(lineP1, lineP2, point):
+    x1 = lineP1[0]
+    y1 = lineP1[1]
+    x2 = lineP2[0]
+    y2 = lineP2[1]
+    x3 = point[0]
+    y3 = point[1]
+
+    a = y1 - y2
+    b = x2 - x1
+    c = (x1 * y2) - (x2 * y1)
+
+    dist = abs((a * x3 + b * y3 + c)) / (math.sqrt(a * a + b * b))
+
+    return dist
+
 
 """
 Removes the LiDAR shadow by casting lines based on the hull of the asset
 Then deleteing if the points are found within the polygon
 """
-def replaceBasedOnShadow(asset, scene, intensity, semantics, instances):
+def replaceBasedOnShadow(asset, scene, intensity, semantics, instances, details):
 
+    # Get the objects shadow
     shadow = getLidarShadowMesh(asset)
     shadowVertices = np.asarray(shadow.vertices)
-    shadowVertices2 = np.copy(shadowVertices)
-    shadowVerticesRaised = np.copy(shadowVertices)
-    hull_ls = o3d.geometry.LineSet.create_from_triangle_mesh(shadow)
-    hull_ls.paint_uniform_color((0, 0.5, 1))
+    
+    # Check above if this is a vehicle type
+    # This avoids cases where is copies large chunks of road / sidewalk into the walls
+    if (details["typeNum"] in globals.instancesVehicle.keys()): 
+        shadowVerticesRaised = np.copy(shadowVertices)
+        shadowVerticesRaised[:, 2] = shadowVerticesRaised[:, 2] + 1
+        pcdShadowRaised = o3d.geometry.PointCloud()
+        pcdShadowRaised.points = o3d.utility.Vector3dVector(shadowVerticesRaised)
+        hullShadowRaised, _ = pcdShadowRaised.compute_convex_hull()
+        # 70 veg, 50: 'building', 51: 'fence',
+        maskAbove = (semantics == 70) | (semantics == 50) | (semantics == 51)
+        sceneVegitation = scene[maskAbove]
+        maskAbove = checkInclusionBasedOnTriangleMesh(sceneVegitation, hullShadowRaised)
 
-
-    # Check above
-    shadowVerticesRaised[:, 2] = shadowVerticesRaised[:, 2] + 1
-    pcdShadowRaised = o3d.geometry.PointCloud()
-    pcdShadowRaised.points = o3d.utility.Vector3dVector(shadowVerticesRaised)
-    hullShadowRaised, _ = pcdShadowRaised.compute_convex_hull()
-    maskNonGround = (semantics != 40) | (semantics != 44) | (semantics != 48) | (semantics != 49) | (semantics != 60) | (semantics != 72)
-    sceneWithoutGround = scene[maskNonGround]
-    maskAbove = checkInclusionBasedOnTriangleMesh(sceneWithoutGround, hullShadowRaised)
-    print("Above: ", np.sum(maskAbove))
-
-    if (np.sum(maskAbove) > 30):
-        print("TOO MANY ABOVE")
-        return False, None, None, None, None,
+        if (np.sum(maskAbove) > 30):
+            print("TOO MANY ABOVE {} ".format(np.sum(maskAbove)))
+            return False, None, None, None, None,
 
     # Remove
 
@@ -607,135 +625,72 @@ def replaceBasedOnShadow(asset, scene, intensity, semantics, instances):
     pcdAsset.points = o3d.utility.Vector3dVector(asset)
     hull, _ = pcdAsset.compute_convex_hull()
     hullVertices = np.asarray(hull.vertices)
+    assetBox = pcdAsset.get_oriented_bounding_box()
 
-    # Find the min and max for that hull
-    minX = sys.maxsize
-    minY = sys.maxsize
-    maxX = sys.maxsize * -1
-    maxY = sys.maxsize * -1
-    for pt in np.asarray(hullVertices):
-        maxX = max(maxX, pt[0])
-        maxY = max(maxY, pt[1])
-        minX = min(minX, pt[0])
-        minY = min(minY, pt[1])
+    # Get the left and right points of the hull
+    # Gets the perpendicular distance to center line taking max of each side 
+    # NOTE Left is synonymous for counter clockwise
+    midPoint = hull.get_center()
+    leftMax = sys.maxsize * -1
+    rightMax = sys.maxsize * -1
+    leftPoint = [0, 0, 0]
+    rightPoint = [0, 0, 0]
+    for point in hullVertices:
+        distFromCenterLine = perpDistToLine(centerCamPoint, midPoint, point)
 
-    # Get distances from the center
-    minsMaxArr = np.asarray([[maxX, maxY, 0], [maxX, minY, 0], [minX, maxY, 0], [minX, minY, 0]])
+        if (isLeft(midPoint, centerCamPoint, point)):
+            if (distFromCenterLine > leftMax):
+                leftMax = distFromCenterLine
+                leftPoint = point
+        else:
+            if (distFromCenterLine > rightMax):
+                rightMax = distFromCenterLine
+                rightPoint = point
 
-    distArr = np.asarray([
-        np.linalg.norm(minsMaxArr[0] - np.asarray([0, 0, 0])),
-        np.linalg.norm(minsMaxArr[1] - np.asarray([0, 0, 0])),
-        np.linalg.norm(minsMaxArr[2] - np.asarray([0, 0, 0])),
-        np.linalg.norm(minsMaxArr[3] - np.asarray([0, 0, 0]))])
+    # Provide two points for hull sides in center
+    midPointMaxZ = hull.get_center() 
+    midPointMinZ = hull.get_center()
+    midPointMaxZ[2] = assetBox.get_max_bound()[2]
+    midPointMinZ[2] = assetBox.get_min_bound()[2] - 1
 
-    permutation = distArr.argsort()
-    minsMaxArr = minsMaxArr[permutation]
-
-    # print("maxMax box {} [{}, {}]".format(distArr[0], maxX, maxY))
-    # print("maxMin box {} [{}, {}]".format(distArr[1], maxX, minY))
-    # print("minMax box {} [{}, {}]".format(distArr[2], minX, maxY))
-    # print("minMin box {} [{}, {}]".format(distArr[3], minX, minY))
-
-    # print("gg box {} {}".format(minsMaxArr[1], minsMaxArr[2]))
-    minBox = minsMaxArr[1]
-    maxBox = minsMaxArr[2]
-
-    # Get closest to the two bounding points selected
-    assetCopy = np.copy(asset)
-    assetCopy[:, 2] = 0
-    pcdAssetNearest = o3d.geometry.PointCloud()
-    pcdAssetNearest.points = o3d.utility.Vector3dVector(assetCopy)
-    pcd_tree = o3d.geometry.KDTreeFlann(pcdAssetNearest)
-    [k, idx, _] = pcd_tree.search_knn_vector_3d(minBox, 1)
-    [k, idx2, _] = pcd_tree.search_knn_vector_3d(maxBox, 1)
-
-    print(asset[idx])
-    print(asset[idx2])
-
-    minBox = asset[idx][0]
-    maxBox = asset[idx2][0]
-
-    midPointX = (minBox[0] + maxBox[0]) / 2
-    midPointY = (minBox[1] + maxBox[1]) / 2
-    midPoint = np.array([midPointX, midPointY, 0])
-
-    left = minBox
-    right = maxBox
-    if (isLeft(centerCamPoint, midPoint, maxBox)):
-        left = maxBox
-        right = minBox
-
-    replaceLeftShadow = [midPoint]
-    replaceRightShadow = [midPoint]
+    # Sort the shadow points into left and right
+    replaceLeftShadow = [midPointMaxZ, midPointMinZ]
+    replaceRightShadow = [midPointMaxZ, midPointMinZ]
     for point in shadowVertices:
-        if (not isLeft(centerCamPoint, midPoint, point)):
+        if (isLeft(midPoint, centerCamPoint, point)):
             replaceLeftShadow.append(point)
         else:
             replaceRightShadow.append(point)
 
-    
-    # leftShadow = flipPointsOverLine(centerCamPoint, left, shadowVertices)
-    # rightShadow = flipPointsOverLine(centerCamPoint, right, shadowVertices2)
-    midLeft = flipPointsOverLine(centerCamPoint, left, [midPoint])[0]
-    midRight = flipPointsOverLine(centerCamPoint, right, [midPoint])[0]
+    # Validate that each side has enough points to be constructed into a mask (4 points min)
+    if (len(replaceLeftShadow) < 4 or len(replaceRightShadow) < 4):
+        print("Not enough points left {} or right {} shadow".format(len(replaceLeftShadow), len(replaceRightShadow)))
+        return False, None, None, None, None
 
-    midLeftPointX = (left[0] + midPoint[0]) / 2
-    midLeftPointY = (left[1] + midPoint[1]) / 2
-    midLeftPoint = np.array([midPointX, midPointY, 0])
-
-    # lx = midLeft[0] - left[0]
-    # ly = midLeft[1] - left[1]
-    # rx = midRight[0] - right[0]
-    # ry = midRight[1] - right[1]
-    # replaceLeftShadow = translatePointsXY(replaceLeftShadow, lx, ly)
-    # replaceRightShadow = translatePointsXY(replaceRightShadow, rx, ry)
-
-    # print(midLeft)
-    # print(left)
-    # print(midPoint)
-    # print(right)
-    # print(midRight)
-
-    angleLeft = getAngleRadians(centerCamPoint, left, midPoint)
-    angleRight = getAngleRadians(centerCamPoint, midPoint, right)
+    # Get the angles for left and right
+    angleLeft = getAngleRadians(centerCamPoint, leftPoint, midPoint)
+    angleRight = getAngleRadians(centerCamPoint, midPoint, rightPoint)
     angleLeft = angleLeft * (180 / math.pi)
     angleRight = angleRight * (180 / math.pi)
-    print(angleLeft)
-    print(angleRight)
-    if angleLeft < 0:
-        angleLeft = angleLeft * -1
-    if angleRight < 0:
-        angleRight = angleRight * -1
-    angleRight = 360 - angleRight
-
-    if (len(replaceLeftShadow) > 4):
-        replaceLeftShadow = rotatePoints(replaceLeftShadow, angleRight)
-    else:
-        print("Left shadow empty {}".format(len(replaceLeftShadow)))
-        return False, None, None, None, None
     
-    if (len(replaceRightShadow) > 4):
-        replaceRightShadow = rotatePoints(replaceRightShadow, angleLeft)
-    else:
-        print("Right shadow empty {}".format(len(replaceRightShadow)))
-        return False, None, None, None, None
+    # Rotate the halves of the shadow
+    replaceLeftShadow = rotatePoints(replaceLeftShadow, 360 - angleLeft)
+    replaceRightShadow = rotatePoints(replaceRightShadow, angleRight)
 
+    # Convert shadow halves to masks
     pcdCastHull = o3d.geometry.PointCloud()
     pcdCastHull.points = o3d.utility.Vector3dVector(replaceLeftShadow)
     shadowRotated, _ = pcdCastHull.compute_convex_hull()
-
     pcdCastHull = o3d.geometry.PointCloud()
     pcdCastHull.points = o3d.utility.Vector3dVector(replaceRightShadow)
     shadowRotated2, _ = pcdCastHull.compute_convex_hull()
 
-    # Copy items
+    # Get points included within the halves of the shadow
     maskIncluded = checkInclusionBasedOnTriangleMesh(scene, shadowRotated)
-
     pcdIncluded = scene[maskIncluded]
     intensityIncluded = intensity[maskIncluded]
     semanticsIncluded = semantics[maskIncluded]
     instancesIncluded = instances[maskIncluded]
-
     maskIncluded2 = checkInclusionBasedOnTriangleMesh(scene, shadowRotated2)
     pcdIncluded2 = scene[maskIncluded2]
     intensityIncluded2 = intensity[maskIncluded2]
@@ -743,9 +698,9 @@ def replaceBasedOnShadow(asset, scene, intensity, semantics, instances):
     instancesIncluded2 = instances[maskIncluded2]
 
 
-
+    # Validate that the points don't include any semantic types that can't be used in a replacement
+    # This prevents situations with half cars being copied
     semSetInval = set()
-    # Print sem data
     for sem in semanticsIncluded:
         if (sem in globals.instancesVehicle.keys()
             or sem in globals.instancesWalls.keys()):
@@ -754,79 +709,52 @@ def replaceBasedOnShadow(asset, scene, intensity, semantics, instances):
         if (sem in globals.instancesVehicle.keys()
             or sem in globals.instancesWalls.keys()):
             semSetInval.add(sem)
-    for sem in semSetInval:
-        print(globals.name_label_mapping[sem])
+    
+    if (len(semSetInval) > 0):
+        invalidSem = ""
+        for sem in semSetInval:
+            invalidSem += (globals.name_label_mapping[sem] + " ")
+        print("Invalid semantics to replace with: {}".format(invalidSem))
+        return False, None, None, None, None
 
 
-    # pcdIncluded = flipPointsOverLine(centerCamPoint, left, pcdIncluded)
-    # pcdIncluded2 = flipPointsOverLine(centerCamPoint, right, pcdIncluded2)
-
+    # Rotate any points included in the shadow halves to fill the hole
     if (len(pcdIncluded) > 0):
         pcdIncluded = rotatePoints(pcdIncluded, angleLeft)
     else:
         print("left points empty")
     if (len(pcdIncluded2) > 0):
-        pcdIncluded2 = rotatePoints(pcdIncluded2, angleRight)
+        pcdIncluded2 = rotatePoints(pcdIncluded2, 360 - angleRight)
     else:
         print("right points empty")
 
-
+    # Combine the left and right replacement points
     pcdIncluded, intensityIncluded, semanticsIncluded, instancesIncluded = combine(pcdIncluded, intensityIncluded, semanticsIncluded, instancesIncluded,
-        pcdIncluded2, intensityIncluded2, semanticsIncluded2, instancesIncluded2)
+                                                                                pcdIncluded2, intensityIncluded2, semanticsIncluded2, instancesIncluded2)
 
+    # TODO REMOVE Visualization
+    # hull_ls = o3d.geometry.LineSet.create_from_triangle_mesh(shadow)
+    # hull_ls.paint_uniform_color((0, 0.5, 1))
+    # hull_ls2 = o3d.geometry.LineSet.create_from_triangle_mesh(shadowRotated)
+    # hull_ls2.paint_uniform_color((0, 1, 0.5))
+    # hull_ls22 = o3d.geometry.LineSet.create_from_triangle_mesh(shadowRotated2)
+    # hull_ls22.paint_uniform_color((1, 0, 0.5))
 
-    # maskGround = (semanticsIncluded == 40) | (semanticsIncluded == 44) | (semanticsIncluded == 48) | (semanticsIncluded == 49) | (semanticsIncluded == 60) | (semanticsIncluded == 72)
-    # maskGround2 = (semanticsIncluded2 == 40) | (semanticsIncluded2 == 44) | (semanticsIncluded2 == 48) | (semanticsIncluded2 == 49) | (semanticsIncluded2 == 60) | (semanticsIncluded2 == 72)
+    # pcdNewAddition = o3d.geometry.PointCloud()
+    # pcdNewAddition.points = o3d.utility.Vector3dVector(pcdIncluded)
+    # pcdScene = o3d.geometry.PointCloud()
+    # pcdScene.points = o3d.utility.Vector3dVector(scene)
 
-    # print(np.sum(maskGround))
-    # print(np.sum(maskGround2))
+    # pcdCast2 = o3d.geometry.PointCloud()
+    # pcdCast2.points = o3d.utility.Vector3dVector(np.asarray([rightPoint, leftPoint, midPointMinZ, midPointMaxZ, midPoint]))
+    # pcdCast2.paint_uniform_color((.6, 0, .6))
 
-    # if np.sum(maskGround) < np.sum(maskGround2):
-    #     pcdIncluded = scene[maskIncluded2]
-    #     intensityIncluded = intensity[maskIncluded2]
-    #     semanticsIncluded = semantics[maskIncluded2]
-    #     instancesIncluded = instances[maskIncluded2]
-    #     m = mMax
-    #     c = cMax
-
-    # print(np.shape(pcdIncluded))
-
-    # for point in pcdIncluded:
-    #     x1 = point[X_AXIS]
-    #     y1 = point[Y_AXIS]
-    #     d = (x1 + ((y1 - c) * m)) / (1 + (m * m))
-    #     x4 = (2 * d) - x1
-    #     y4 = (2 * d * m) - y1 + (2 * c)
-    #     point[X_AXIS] = x4
-    #     point[Y_AXIS] = y4
-
-    hull_ls2 = o3d.geometry.LineSet.create_from_triangle_mesh(shadowRotated)
-    hull_ls2.paint_uniform_color((0, 1, 0.5))
-    hull_ls22 = o3d.geometry.LineSet.create_from_triangle_mesh(shadowRotated2)
-    hull_ls22.paint_uniform_color((1, 0, 0.5))
-    hull_ls44 = o3d.geometry.LineSet.create_from_triangle_mesh(hullShadowRaised)
-    hull_ls44.paint_uniform_color((0, 0.2, 1))
-
-    pcdNewAddition = o3d.geometry.PointCloud()
-    pcdNewAddition.points = o3d.utility.Vector3dVector(pcdIncluded)
-    pcdScene = o3d.geometry.PointCloud()
-    pcdScene.points = o3d.utility.Vector3dVector(scene)
-
-
-    pcdCast2 = o3d.geometry.PointCloud()
-    pcdCast2.points = o3d.utility.Vector3dVector(np.asarray([minBox, maxBox]))
-    pcdCast2.paint_uniform_color((.6, 0, .6))
-
-    # o3d.visualization.draw_geometries([hull_ls, hull_ls2, hull_ls22, hull_ls44, pcdNewAddition, pcdScene, pcdCast2])
     # o3d.visualization.draw_geometries([hull_ls, hull_ls2, hull_ls22, pcdNewAddition, pcdScene, pcdCast2])
-    # o3d.visualization.draw_geometries([hull, pcdCastHull22, pcdCast2])
-    
 
 
+    # Combine the new points with the scene to fill the asset's hole 
     sceneReplace, intensityReplace, semanticsReplace, instancesReplace = combine(pcdIncluded, intensityIncluded, semanticsIncluded, instancesIncluded,
         scene, intensity, semantics, instances)
-
-
 
     return True, sceneReplace, intensityReplace, semanticsReplace, instancesReplace
 
@@ -937,12 +865,12 @@ def getAngleRadians(p0, p1, p2):
     p2x = p2[0]
     p2y = p2[1]
 
-    result = math.atan2(p2y - p0y, p2x - p0x) - math.atan2(p1y - p0y, p1x - p0x)
+    # result = math.atan2(p2y - p0y, p2x - p0x) - math.atan2(p1y - p0y, p1x - p0x)
 
 
     # degreesResult = result * (180 / math.pi)
 
-    return result
+    
     # return degreesResult
 
     # a = np.asarray(p0x - p1x, p0y - p1y)
@@ -951,6 +879,16 @@ def getAngleRadians(p0, p1, p2):
     # return np.arccos((a * b) / (np.absolute(a) * np.absolute(b)))
 
 
+
+    # arccos((P122 + P132 - P232) / (2 * P12 * P13))
+    # sqrt((P1x - P2x) ^2 + (P1y - P2y) ^2)
+    p01 = math.sqrt(((p0x - p1x) * (p0x - p1x)) + ((p0y - p1y) * (p0y - p1y)))
+    p02 = math.sqrt(((p0x - p2x) * (p0x - p2x)) + ((p0y - p2y) * (p0y - p2y)))
+    p12 = math.sqrt(((p1x - p2x) * (p1x - p2x)) + ((p1y - p2y) * (p1y - p2y)))
+
+    result = np.arccos(((p01 * p01) + (p02 * p02) - (p12 * p12)) / (2 * p01 * p02))
+
+    return result
 
 
 
@@ -1010,7 +948,7 @@ def alignZdim(asset, scene, semantics):
 
 
 # Get closest to the two bounding points selected
-def closestBoundingTwo(min, max, asset):
+def closestBoundingTwo(minPt, maxPt, asset):
 
     # Remove Z dim
     assetCopy = np.copy(asset)
@@ -1020,8 +958,8 @@ def closestBoundingTwo(min, max, asset):
     pcdAssetNearest = o3d.geometry.PointCloud()
     pcdAssetNearest.points = o3d.utility.Vector3dVector(assetCopy)
     pcd_tree = o3d.geometry.KDTreeFlann(pcdAssetNearest)
-    [k, idx, _] = pcd_tree.search_knn_vector_3d(min, 1)
-    [k, idx2, _] = pcd_tree.search_knn_vector_3d(max, 1)
+    [k, idx, _] = pcd_tree.search_knn_vector_3d(minPt, 1)
+    [k, idx2, _] = pcd_tree.search_knn_vector_3d(maxPt, 1)
 
     return asset[idx][0], asset[idx2][0]
 
@@ -1190,11 +1128,12 @@ def pointsToMesh(mesh, assetData, sceneData):
     pcdAssetNearest.points = o3d.utility.Vector3dVector(newAsset)
     pcd_tree = o3d.geometry.KDTreeFlann(pcdAssetNearest)
     for pointIndex in range(0, len(newAssetScene)):
-        [k, idx, _] = pcd_tree.search_knn_vector_3d(point, 1)
+        [k, idx, _] = pcd_tree.search_knn_vector_3d(newAssetScene[pointIndex], 1)
         intensityIntersect[pointIndex] = intensityAsset[idx]
         semanticsIntersect[pointIndex] = semanticsAsset[idx]
         instancesIntersect[pointIndex] = instancesAsset[idx]
 
+    # Combine the original points of the asset and the new scene points
     newAsset, intensityAsset, semanticsAsset, instancesAsset = combine(newAsset, intensityAsset, semanticsAsset, instancesAsset, 
                                                                     newAssetScene, intensityIntersect, semanticsIntersect, instancesIntersect)
 
@@ -1206,6 +1145,7 @@ def pointsToMesh(mesh, assetData, sceneData):
 
 def signReplace(signAsset, intensityAsset, semanticsAsset, instancesAsset, scene, intensity, semantics, instances, details):
 
+    # Seperate the two portions of a tagged sign
     pole = signAsset[semanticsAsset == 80]
     intensityPole = intensityAsset[semanticsAsset == 80]
     semanticsPole = semanticsAsset[semanticsAsset == 80]
@@ -1215,12 +1155,12 @@ def signReplace(signAsset, intensityAsset, semanticsAsset, instancesAsset, scene
     semanticsSign = semanticsAsset[semanticsAsset == 81]
     instancesSign = instancesAsset[semanticsAsset == 81]
 
+    # Validate that there are enough points to make a hull from
     if (np.shape(pole)[0] < 5 or np.shape(sign)[0] < 5):
         print("Sign {} pole {}, too little points".format(np.shape(sign)[0], np.shape(pole)[0]))
         return False, None, None, None, None, None, None, None, None, details
     
-    # Get bounds to align the sign to 
-    print(np.shape(sign))
+    # Get the bounding box for both the sign and pole
     pcdSign = o3d.geometry.PointCloud()
     pcdSign.points = o3d.utility.Vector3dVector(sign)
     signBox = pcdSign.get_oriented_bounding_box()
@@ -1228,8 +1168,11 @@ def signReplace(signAsset, intensityAsset, semanticsAsset, instancesAsset, scene
     pcdPole = o3d.geometry.PointCloud()
     pcdPole.points = o3d.utility.Vector3dVector(pole)
     poleBox = pcdPole.get_oriented_bounding_box()
+
+    # Center the new sign on the pole
     signCenter = poleBox.get_center()
     
+    # Get bounds to align the sign to 
     minSign, maxSign = closestBoundingTwo(signBox.get_min_bound(), signBox.get_max_bound(), sign)
 
     minZSign = sys.maxsize
@@ -1263,28 +1206,31 @@ def signReplace(signAsset, intensityAsset, semanticsAsset, instancesAsset, scene
         details["sign"] = "stop"
 
 
+    # Get the bounds and height of the current sign
     meshMin = signMesh.get_min_bound()
     meshMax = signMesh.get_max_bound()
     heightMesh = meshMax[2] - meshMin[2]
     meshMax[2] = minZSign
     meshMin[2] = minZSign
-    meshLen = np.linalg.norm(meshMin - meshMin)
-
+    
+    # Validate that the sign is not too low to the ground
     if (minZSign < -1):
         print("Sign too low min {}".format(minZSign))
         return False, None, None, None, None, None, None, None, None, details
 
+    # Validate that the og sign and new sign are roughly the same size
+    meshLen = np.linalg.norm(meshMin - meshMin)
     if (np.absolute(meshLen - signLen) > 2):
         print("Distance to sign too great: mesh len {}, sign len {}".format(meshLen, signLen))
         return False, None, None, None, None, None, None, None, None, details
 
 
-    # Move the mesh to the center of the based on pole center, sign min, and height of the sign
+    # Move the mesh to new location based on: pole center, original sign min, and height of the new sign
     signCenter[2] = minZSign + (heightMesh / 2) 
     signMesh.translate(signCenter, relative=False)
     angleSign = getAngleRadians(signCenter, minSign, signMesh.get_min_bound())
 
-    # Get two rotation options
+    # Get two rotation options to match the original sign
     rotation = signMesh.get_rotation_matrix_from_xyz((0, 0, angleSign * -1))
     rotation2 = signMesh.get_rotation_matrix_from_xyz((0, 0, angleSign))
     signMeshRotate1 = copy.deepcopy(signMesh)
@@ -1292,7 +1238,7 @@ def signReplace(signAsset, intensityAsset, semanticsAsset, instancesAsset, scene
     signMeshRotate1.rotate(rotation, center=signMeshRotate1.get_center())
     signMeshRotate2.rotate(rotation2, center=signMeshRotate2.get_center())
 
-    # Get the rotation that is closer to the sign
+    # Get the rotation that is closer to the original sign's angle 
     dist1 = np.linalg.norm(minSign - signMeshRotate1.get_min_bound())
     dist2 = np.linalg.norm(minSign - signMeshRotate2.get_min_bound())
     if (dist1 < dist2):
@@ -1301,14 +1247,12 @@ def signReplace(signAsset, intensityAsset, semanticsAsset, instancesAsset, scene
         signMesh = signMeshRotate2
 
 
-    
-
     # Add the pole points to the scene
     scene, intensity, semantics, instances = combine(scene, intensity, semantics, instances, 
                                                     pole, intensityPole, semanticsPole, instancesPole)
 
 
-    # Pull the points to the mesh
+    # Pull the points in the scene to the new sign mesh
     assetData = (sign, intensitySign, semanticsSign, instancesSign)
     sceneData = (scene, intensity, semantics, instances)
     success, newAssetData, newSceneData = pointsToMesh(signMesh, assetData, sceneData)
@@ -1316,7 +1260,8 @@ def signReplace(signAsset, intensityAsset, semanticsAsset, instancesAsset, scene
     sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, instancesNonIntersect = newSceneData
     sign, intensitySign, semanticsSign, instancesSign = newAssetData
 
-    if (success and np.shape(sign)[0] < 20):
+    # Validate that the sign has points
+    if (success and np.shape(sign)[0] < 15):
         print("Sign too little points")
         success = False
 
@@ -1334,12 +1279,12 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, instancesAsset,
     pcdAsset.orient_normals_towards_camera_location()
 
     # Create a mesh using the ball pivoting method
-    mesh = None
-    if (np.shape(asset)[0] < 5000):
-        radii = [0.15, 0.15, 0.15, 0.15]
-        mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(pcdAsset, o3d.utility.DoubleVector(radii))
-    else:
-        mesh, _ = pcdAsset.compute_convex_hull()
+    # mesh = None
+    # if (np.shape(asset)[0] < 5000):
+    radii = [0.15, 0.15, 0.15, 0.15]
+    mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(pcdAsset, o3d.utility.DoubleVector(radii))
+
+    o3d.visualization.draw_geometries([mesh])
 
     # Check that the mesh is valid
     if (np.shape(np.array(mesh.vertices))[0] < 1 or np.shape(np.array(mesh.triangles))[0] < 1):
@@ -1351,9 +1296,8 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, instancesAsset,
     details["scale"] = scale
     mesh.scale(scale, center=mesh.get_center())
 
-    # Scale the points
+    # Scale the points to use later for intensity 
     scaledPoints = copy.deepcopy(pcdAsset).scale(scale, center=mesh.get_center())
-
 
     # http://www.open3d.org/docs/latest/tutorial/geometry/ray_casting.html
     # Calulate intersection for scene to mesh points
@@ -1416,7 +1360,7 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, instancesAsset,
     # Fix the intensity of each of the points in the scene that were pulled into the asset by using the closest scaled asset point
     pcd_tree = o3d.geometry.KDTreeFlann(scaledPoints)
     for pointIndex in range(0, len(newAssetScene)):
-        [k, idx, _] = pcd_tree.search_knn_vector_3d(point, 1)
+        [k, idx, _] = pcd_tree.search_knn_vector_3d(newAssetScene[pointIndex], 1)
         intensityIntersect[pointIndex] = intensityAsset[idx]
         semanticsIntersect[pointIndex] = semanticsAsset[idx]
         instancesIntersect[pointIndex] = instancesAsset[idx]
@@ -1427,11 +1371,11 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, instancesAsset,
 
     # print(np.shape(newAsset))
     if (np.shape(newAsset)[0] < 20):
-        print("New asset too small {}".format(np.shape(newAsset)[0]))
+        print("New asset too little points {}".format(np.shape(newAsset)[0]))
         return False, None, None, None, None, None, None, None, None, None
 
 
-    # Return revised scene
+    # Return revised scene with scaled vehicle 
     return True, newAsset, intensityAsset, semanticsAsset, instancesAsset, sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, instancesNonIntersect, details
 
 

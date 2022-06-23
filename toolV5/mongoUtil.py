@@ -13,6 +13,7 @@ assetCollection = None
 assetMetadataCollection = None
 mutationCollection = None
 accuracyCollection = None
+finalDataCollection = None
 
 
 
@@ -24,6 +25,7 @@ def mongoConnect():
     global assetMetadataCollection
     global mutationCollection
     global accuracyCollection
+    global finalDataCollection
 
     configFile = open("../mongoconnect.txt", "r")
     mongoUrl = configFile.readline()
@@ -37,6 +39,7 @@ def mongoConnect():
     assetMetadataCollection = db["asset_metadata3"]
     mutationCollection = db["mutations"]
     accuracyCollection = db["base_accuracy"]
+    finalDataCollection = db["final_data"]
 
 
 """
@@ -204,8 +207,11 @@ def saveMutationDetails(mutationData):
     mutationCollection.insert_many(mutationData)
 
 
-
-
+"""
+Save final data
+"""
+def saveFinalData(finalData):
+    finalDataCollection.insert_one(finalData)
 
 
 

@@ -3,8 +3,7 @@ import numpy as np
 from enum import Enum
 import glob, os
 import shutil
-import uuid
-
+import shortuuid
 
 # -------------------------------------------------------
 
@@ -86,7 +85,6 @@ instancesWalls = {
     50: 'building',
     51: 'fence',
     52: 'other-structure',
-    70: 'vegetation',
     71: 'trunk',
     80: 'pole',
     81: 'traffic-sign',
@@ -164,7 +162,7 @@ saveMutationFlag = True
 
 
 batchNum = 0
-iterationNum = 0
+expectedNum = 0
 
 
 # Paths to the directories where specific things are stored
@@ -186,10 +184,12 @@ dataDir = ""
 doneLabelDir = ""
 
 
-batchId = str(uuid.uuid4())
+batchId = str(shortuuid.uuid())
 
 
 assetId = None
+
+models = ["cyl", "spv", "sal"]
 
 # ---------------------------------------------------------------
 
@@ -499,7 +499,7 @@ def init(args):
     global saveAt
 
     global batchNum
-    global iterationNum
+    global expectedNum
 
 
     print("Running Setup")
@@ -530,7 +530,7 @@ def init(args):
     binFiles, labelFiles = getBinsLabels(args.path, args.lbls, args.seq, args.scene)
 
     batchNum = int(args.b)
-    iterationNum = int(args.i)
+    expectedNum = int(args.count)
     
     # Specific mutation arguments
     if (args.intensity):

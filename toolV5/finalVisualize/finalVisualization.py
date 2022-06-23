@@ -152,16 +152,21 @@ def handleOne(mutation, mutationId):
 
     print("Saving {} {}".format(mutation, mutationId))
 
+    # Get the mutation data
+    item = mutationCollection.find_one({ "_id" : mutationId })
+
+    # Validate we have the details
+    if (item == None):
+        print("Details {} not found".format(mutationId))
+        return
+
     # imageList = []
     imgs = []
     font = ImageFont.truetype("/usr/share/fonts/truetype/freefont/FreeSansBold.ttf", 16)
     
     saveDir = finalVisDir + "/" + mutation + "/" + mutationId + "/"
 
-    # Get the mutation data
-    item = mutationCollection.find_one({ "_id" : mutationId })
-
-
+    
     # Intensity Version
     scan.setIntensityColorType(True)
 
@@ -248,7 +253,7 @@ def handleOne(mutation, mutationId):
         imgs.append(np.asarray(newModelImage))
 
 
-  
+
     # Combine into one image
     # https://stackoverflow.com/questions/30227466/combine-several-images-horizontally-with-python
     combineSave = finalVisDir + "/" + mutation + "/" + mutationId + ".png"
