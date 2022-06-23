@@ -9,10 +9,10 @@
 
 # Options
 
-mut="SCENE_DEFORM"
+# mut="SCENE_DEFORM"
 # mut="SCENE_MIRROR_ROTATE"
 # mut="SCENE_REMOVE"
-# mut="ADD_ROTATE"
+mut="ADD_ROTATE"
 # mut="ADD_MIRROR_ROTATE"
 # mut="SIGN_REPLACE"
 # mut="SCENE_INTENSITY"
@@ -38,7 +38,7 @@ batch=100
 # Run command 
 
 # python semFuzzLidar.py -path "$velPath" -lbls $lblPath
-python semFuzzLidar.py -path "$velPath" -lbls $lblPath -m $mut -count $count -b $batch
+python semFuzzLidar.py -path "$velPath" -lbls $lblPath -m $mut -count $count -b $batch -ns -vis
 # python semFuzzLidar.py -path "$velPath" -lbls $lblPath -m $mut -i $iter -b $batch -ns
 # python semFuzzLidar.py -path "$velPath" -lbls $lblPath -m $mut -i $iter -b $batch -vis -ns
 # python semFuzzLidar.py -path "$velPath" -lbls $lblPath -m $mut -i $iter -b $batch -ns

@@ -1,6 +1,12 @@
+"""
+eval 
+Handles evaluation of predictions files, runs models, updates the final analytics 
+
+@Author Garrett Christian
+@Date 6/23/22
+"""
 
 
-from pymongo import MongoClient
 import glob, os
 import numpy as np
 from os.path import basename
@@ -11,6 +17,10 @@ import time
 
 import globals
 import mongoUtil
+
+
+# --------------------------------------------------------------------------
+# Constants
 
 name_label_mapping = {
     0: 'unlabeled',
@@ -145,13 +155,9 @@ modelCyl = "cyl"
 modelSpv = "spv"
 modelSal = "sal"
 
-# resultsDir = "/home/garrett/Documents/data/results"
-# dataRoot = "/home/garrett/Documents/data/tmp/dataset"
 
-
-models = [modelCyl, modelSpv, modelSal]
-
-# ------------------
+# --------------------------------------------------------------------------
+# Runners
 
 """
 Runner for the Cylinder3D model
@@ -217,7 +223,8 @@ def runSal():
     os.system(runCommand)
 
 
-# ------------------
+# --------------------------------------------------------------------------
+# Evaluators
 
 
 """
@@ -307,7 +314,6 @@ class iouEval:
     return acc_mean  # returns "acc mean"
 
 
-# ------------------
 
 """
 Evaluates a label file against a prediction file
@@ -440,7 +446,7 @@ def evalLabels(label_file, pred_file, model, details):
     return results
     
 
-# ------------------
+# --------------------------------------------------------------------------
 
 """
 Evaluates a given set of mutations
@@ -549,10 +555,7 @@ def evalBatch(threadNum, details):
 
 
 
-# ------------------
-
-
-
+# --------------------------------------------------------------------------
 # FINAL DETAILS EVAL
 
 
@@ -794,7 +797,7 @@ def updateFinalDetails(details, finalData):
     idInUse = set()
     for mutation in globals.mutationsEnabled:
         mutationString = str(mutation).replace("Mutation.", "")
-        for model in models:
+        for model in globals.models:
             for detailRecord in finalData[model][mutationString]["top_acc"]:
                 idInUse.add(detailRecord[0])
             for detailRecord in finalData[model][mutationString]["top_jac"]:

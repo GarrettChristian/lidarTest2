@@ -22,8 +22,7 @@ mutationSet = set(mutations)
 
 def creatBucketCol(bucketData, bucketKey):
     
-    col = ["", bucketKey]
-    col.append(bucketData["total"])
+    col = [bucketKey, "total"]
     for model in models:
         col.append(bucketData["total_" + model])
         
@@ -65,8 +64,7 @@ def creatBucketCol(bucketData, bucketKey):
 
 def creatAllCol(allData):
     
-    col = ["", "All"]
-    col.append(allData["total"])
+    col = ["All", "total"]
     for _ in models:
         col.append("")
         
@@ -96,7 +94,7 @@ def createMutationCsv(mutationDataAcc, mutation, accType):
 
     cols = []
 
-    titleCol = [mutation, "", "Total"]
+    titleCol = [mutation, "Total"]
     for model in models:
         titleCol.append(model + " Total")
         

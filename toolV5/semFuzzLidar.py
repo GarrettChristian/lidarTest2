@@ -1,4 +1,10 @@
+"""
+semFuzzLidar 
+Main runner for the mutation tool
 
+@Author Garrett Christian
+@Date 6/23/22
+"""
 
 
 import numpy as np

@@ -7,18 +7,18 @@ saveDir="/home/garrett/Documents/savingRuns/runs6_23"
 
 # echo "Running Tool"
 
-mut="SCENE_DEFORM"
+# mut="SCENE_DEFORM"
 # mut="SCENE_MIRROR_ROTATE"
 # mut="SCENE_REMOVE"
 # mut="ADD_ROTATE"
 # mut="ADD_MIRROR_ROTATE"
 # mut="SIGN_REPLACE"
-# mut="SCENE_INTENSITY"
+mut="SCENE_INTENSITY"
 # mut="SCENE_SCALE"
 
 velPath="/home/garrett/Documents/data/dataset/sequences/"
 lblPath="/home/garrett/Documents/data/dataset2/sequences/"
-count=100
+count=2000
 batch=100
 
 
@@ -53,12 +53,13 @@ cd ..
 echo "Moving data"
 
 current_time=$(date "+%Y_%m_%d-%H_%M_%S")
-echo "Current Time : $current_time"
+echo "Current Time: $current_time"
  
 newDir=$mut"_"$current_time
-echo "Dir name: " "$new_fileName"
+echo "Dir name: $newDir"
 
 newSaveDir=$saveDir/$newDir
+echo "Save at: $newSaveDir"
 
 mkdir $newSaveDir
 

@@ -1,3 +1,13 @@
+"""
+globals 
+Handles all data that needs to be shared in the tool
+Performs the initial setup
+Enums, paths, flags
+
+@Author Garrett Christian
+@Date 6/23/22
+"""
+
 
 import numpy as np
 from enum import Enum
@@ -139,6 +149,16 @@ class Mutation(Enum):
     SCENE_REMOVE = "SCENE_REMOVE",
     SIGN_REPLACE = "SIGN_REPLACE",
     SCENE_SCALE = "SCENE_SCALE"
+
+
+# Enum of the different types of sign replacements
+class Signs(Enum):
+    YEILD = "YEILD",
+    CROSSBUCK = "CROSSBUCK",
+    WARNING = "WARNING",
+    SPEED = "SPEED",
+    STOP = "STOP",
+    
 
 
 binFiles = []

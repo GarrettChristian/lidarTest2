@@ -1,13 +1,18 @@
+"""
+mongoUtil 
+Handles all database interaction
+
+@Author Garrett Christian
+@Date 6/23/22
+"""
 
 from pymongo import MongoClient
 
-
 import globals
 import fileIoUtil
-import numpy as np
-import os
-import json
 
+# --------------------------------------------------------------------------
+# Collections
 
 assetCollection = None
 assetMetadataCollection = None
@@ -15,6 +20,7 @@ mutationCollection = None
 accuracyCollection = None
 finalDataCollection = None
 
+# --------------------------------------------------------------------------
 
 
 """
@@ -38,8 +44,7 @@ def mongoConnect():
     assetCollection = db["assets3"]
     assetMetadataCollection = db["asset_metadata3"]
     mutationCollection = db["mutations"]
-    # accuracyCollection = db["base_accuracy"]
-    accuracyCollection = db["base_acc_og"]
+    accuracyCollection = db["base_accuracy"]
     finalDataCollection = db["final_data"]
 
 

@@ -1,7 +1,16 @@
+"""
+fileIoUtil 
+Handles the file operations to get and save labels and bins
 
+@Author Garrett Christian
+@Date 6/23/22
+"""
 
 
 import numpy as np
+
+
+# --------------------------------------------------------------------------
 
 
 """
