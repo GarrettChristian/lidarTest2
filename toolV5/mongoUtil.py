@@ -38,7 +38,8 @@ def mongoConnect():
     assetCollection = db["assets3"]
     assetMetadataCollection = db["asset_metadata3"]
     mutationCollection = db["mutations"]
-    accuracyCollection = db["base_accuracy"]
+    # accuracyCollection = db["base_accuracy"]
+    accuracyCollection = db["base_acc_og"]
     finalDataCollection = db["final_data"]
 
 

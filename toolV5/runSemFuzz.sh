@@ -9,10 +9,10 @@
 
 # Options
 
-# mut="SCENE_DEFORM"
+mut="SCENE_DEFORM"
 # mut="SCENE_MIRROR_ROTATE"
 # mut="SCENE_REMOVE"
-mut="ADD_ROTATE"
+# mut="ADD_ROTATE"
 # mut="ADD_MIRROR_ROTATE"
 # mut="SIGN_REPLACE"
 # mut="SCENE_INTENSITY"
