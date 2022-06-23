@@ -1,5 +1,4 @@
 
-
 from pymongo import MongoClient
 import glob, os
 import numpy as np
@@ -7,6 +6,7 @@ import open3d as o3d
 from np_ioueval import iouEval
 import sys
 from os.path import basename
+import argparse
 
 
 name_label_mapping = {
@@ -132,7 +132,7 @@ learning_ignore = { # Ignore classes
 
 
 # https://github.com/PRBonn/semantic-kitti-api/blob/master/evaluate_semantics.py
-def defEvalV1(label_file, pred_file, seq, model):
+def defEval(label_file, pred_file, seq, model):
 
     print()
     print(label_file)
@@ -227,15 +227,28 @@ def defEvalV1(label_file, pred_file, seq, model):
 Connect to mongodb 
 """
 def mongoConnect():
-    configFile = open("../mongoconnect.txt", "r")
+    configFile = open("../../mongoconnect.txt", "r")
     mongoUrl = configFile.readline()
-    print("Connecting to: ", mongoUrl)
     configFile.close()
     
     client = MongoClient(mongoUrl)
     db = client["lidar_data"]
     return db
 
+
+def parse_args():
+    p = argparse.ArgumentParser(
+        description='Model Runner')
+    p.add_argument("-labels", 
+        help="Path to the labels", 
+        nargs='?', const="/home/garrett/Documents/data/dataset/sequences/", 
+        default="/home/garrett/Documents/data/dataset/sequences/")
+    p.add_argument("-pred", 
+        help="Path to the predictions made by the tools", 
+        nargs='?', const="/home/garrett/Documents/data/resultsBase/", 
+        default="/home/garrett/Documents/data/resultsBase/")
+    
+    return p.parse_args()
 
 
 def main():
@@ -249,13 +262,15 @@ def main():
     print("Connected")
 
 
-
-
     # label_file = "/Users/garrettchristian/DocumentsDesktop/uva21/summerProject/lidarTest2/eval/bus.label"
     # pred_file = "/Users/garrettchristian/DocumentsDesktop/uva21/summerProject/lidarTest2/eval/busCy.label"
 
-    labelBasePath = "/home/garrett/Documents/data/dataset/sequences/"
-    predBasePath = "/home/garrett/Documents/data/resultsBase/"
+    # labelBasePath = "/home/garrett/Documents/data/dataset/sequences/"
+    # predBasePath = "/home/garrett/Documents/data/resultsBase/"
+
+    args = parse_args() 
+    labelBasePath = args.labels
+    predBasePath = args.pred
     
     for x in range(0, 11):
 
@@ -280,9 +295,9 @@ def main():
         predFilesSpv = sorted(predFilesSpv)        
         for index in range(0, len(labelFiles)):
 
-            cyl = defEvalV1(labelFiles[index], predFilesCyl[index], folderNum, "cyl")
-            sal = defEvalV1(labelFiles[index], predFilesSal[index], folderNum, "sal")
-            spv = defEvalV1(labelFiles[index], predFilesSpv[index], folderNum, "spv")
+            cyl = defEval(labelFiles[index], predFilesCyl[index], folderNum, "cyl")
+            sal = defEval(labelFiles[index], predFilesSal[index], folderNum, "sal")
+            spv = defEval(labelFiles[index], predFilesSpv[index], folderNum, "spv")
 
             add.append(cyl)
             add.append(sal)
