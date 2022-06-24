@@ -195,11 +195,11 @@ def getAssetById(id):
 
 
 """
-Gets an asset by the id
+Gets the base accuracy obtained on a given scene
 """
-def getBaseAccuracy(sequence, scene, model):
+def getBaseAccuracy(sequence, scene):
 
-    baseAcc = accuracyCollection.find_one({"sequence": sequence, "scene": scene, "model": model})
+    baseAcc = accuracyCollection.find_one({"sequence": sequence, "scene": scene})
 
     return baseAcc
 

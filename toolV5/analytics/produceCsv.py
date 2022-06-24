@@ -22,7 +22,8 @@ mutationSet = set(mutations)
 
 def creatBucketCol(bucketData, bucketKey):
     
-    col = [bucketKey, "total"]
+    col = [bucketKey]
+    col.append(bucketData["total"])
     for model in models:
         col.append(bucketData["total_" + model])
         
@@ -64,7 +65,8 @@ def creatBucketCol(bucketData, bucketKey):
 
 def creatAllCol(allData):
     
-    col = ["All", "total"]
+    col = ["All"]
+    col.append(allData["total"])
     for _ in models:
         col.append("")
         

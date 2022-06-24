@@ -290,13 +290,13 @@ class iouEval:
         sumJac += tp[className] / unionClass
         classesNonZero += 1
 
-    iou_mean = sumJac / classesNonZero
+    iou_mean_modified = sumJac / classesNonZero
 
     intersection = tp
     union = tp + fp + fn + 1e-15
     iou = intersection / union
-    # iou_mean = (intersection[self.include] / union[self.include]).mean()
-    return iou_mean, iou  # returns "iou mean", "iou per class" ALL CLASSES
+    iou_mean = (intersection[self.include] / union[self.include]).mean()
+    return iou_mean, iou_mean_modified, iou  # returns "iou mean", "iou per class" ALL CLASSES
 
   # def getIoU(self):
   #   tp, fp, fn = self.getStats()
@@ -327,7 +327,7 @@ https://github.com/PRBonn/semantic-kitti-api/blob/master/evaluate_semantics.py
 @param details dictionary that enumerates what occured in this transformation
 @return results with accuracy results for this model and pair of labels
 """
-def evalLabels(label_file, pred_file, model, details):
+def evalLabels(label_file, pred_file, baseAccuracy, baseAccuracyAsset, typeNum, mutation):
 
     # print()
     # print(label_file)
@@ -374,15 +374,12 @@ def evalLabels(label_file, pred_file, model, details):
 
     # when I am done, print the evaluation
     m_accuracy = evaluator.getacc()
-    m_jaccard, class_jaccard = evaluator.getIoU()
+    m_jaccard, m_jaccard_modified, class_jaccard = evaluator.getIoU()
 
     results = {}
 
-
-    results["_id"] = model + "-" + fileName
-    results["file"] = fileName
-    results["model"] = model
     results["jaccard"] = m_jaccard.item()
+    results["jaccardAlt"] = m_jaccard_modified.item()
     results["accuracy"] = m_accuracy.item()
 
     # collect classwise jaccard
@@ -390,21 +387,90 @@ def evalLabels(label_file, pred_file, model, details):
         if i not in ignore:
             results[name_label_mapping[learning_map_inv[i]]] = jacc
 
-
-    baseAccuracy = mongoUtil.getBaseAccuracy(details["baseSequence"], details["baseScene"], model)
-
     jacChange = results["jaccard"] - baseAccuracy["jaccard"]
     accChange = results["accuracy"] - baseAccuracy["accuracy"]
     
+    results["jaccardChangeAlt"] = results["jaccardAlt"] - baseAccuracy["jaccardAlt"]
     results["jaccardChange"] = jacChange
     results["accuracyChange"] = accChange
 
-    # Asset accuracy change
-    if "ADD" in details["mutation"]:
-        baseAccuracyAsset = mongoUtil.getBaseAccuracy(details["assetSequence"], details["assetScene"], model)
-        type = name_label_mapping[learning_map_inv[learning_map[details["typeNum"]]]]
-        typeJacChange = results[type] - baseAccuracyAsset[type]
+    # Get set of classes found within the label
+    classesInLabel = set(label)
+
+    # Asset accuracy change (ADD ONLY)
+    if "ADD" in mutation:
+
+        typeNumReduced = learning_map_inv[learning_map[typeNum]]
+        typeNameAsset = name_label_mapping[typeNumReduced]
+        typeJacChange = results[typeNameAsset] - baseAccuracyAsset[typeNameAsset]
         results["jaccardChangeAsset"] = typeJacChange
+
+        results["22typeNumReduced"] = typeNumReduced
+        results["22typeNameAsset"] = typeNameAsset
+        results["22baseAccuracyAsset"] = baseAccuracyAsset[typeNameAsset]
+
+        totalClasses = 0
+        jaccardAdd = 0
+        for classNum in learning_map_inv.keys():
+            if classNum not in ignore:
+                totalClasses += 1
+                classNumInv = learning_map_inv[classNum]
+                className = name_label_mapping[classNumInv]
+                baseClassJacc = baseAccuracy[className]
+                # Found some guesses in original of type average between the two 
+                if (classNum == learning_map[typeNum] and baseClassJacc > 0):
+                    # Replace the asset you added to the scene with the original guess for that class
+                    # So if you added a person and originally in the base there was a person 
+                    # this should scale if you guessed the class originally 
+                    averageOfClass = (baseAccuracyAsset[typeNameAsset] + baseClassJacc) / 2
+                    jaccardAdd += averageOfClass
+                    results["2" + className] = averageOfClass
+                # Was class 0 in base prediction, likely was not there add from asset prediction jaccard
+                elif (classNum == learning_map[typeNum]): # baseClassJacc == 0
+                    # Replace the asset you added to the scene with the original guess for that class
+                    # So if you added a person and originally in the base there was no person 
+                    # this should scale if you guessed the class originally 
+                    jaccardAdd += baseAccuracyAsset[typeNameAsset]
+                    results["2" + className] = baseAccuracyAsset[typeNameAsset]
+                elif (classNum in classesInLabel):
+                    jaccardAdd += baseClassJacc
+                    results["2" + className] = baseClassJacc
+                else:
+                # Add 0 if not found in new label class, this could happen if you cover the only person 
+                    results["2" + className] = 0
+
+                
+
+        jaccardAddBase = jaccardAdd / totalClasses
+        results["jaccardAddBase"] = jaccardAddBase
+        results["jaccardChangeOrig"] = jacChange
+        results["jaccardChange"] = results["jaccard"] - jaccardAddBase
+
+
+    if "REMOVE" in mutation:
+
+
+        totalClasses = 0
+        jaccardRemove = 0
+        
+        for classNum in learning_map_inv.keys():
+            if classNum not in ignore:
+                totalClasses += 1
+                classInvName = name_label_mapping[classNum]
+                baseClassJacc = baseAccuracy[classInvName]
+                if (classNum in classesInLabel):
+                    jaccardRemove += baseClassJacc
+                # Add 0 if not found in new label class, this could happen if you remove the only person 
+        
+        jaccardRemoveBase = jaccardRemove / totalClasses
+        results["jaccardRemoveBase"] = jaccardRemoveBase
+        results["jaccardChangeOrig"] = jacChange
+        results["jaccardChange"] = results["jaccard"] - jaccardRemoveBase
+
+
+        
+        
+        
 
 
     # Bucketing
@@ -413,11 +479,11 @@ def evalLabels(label_file, pred_file, model, details):
     bucketA = 0 # percentLoss >= 0.1 %
     if (percentLossAcc < -5):
         bucketA = 5
-    elif (percentLossAcc < -2):
+    elif (percentLossAcc < -3):
         bucketA = 4
-    elif (percentLossAcc < -1):
+    elif (percentLossAcc < -2):
         bucketA = 3
-    elif (percentLossAcc < -0.5):
+    elif (percentLossAcc < -1):
         bucketA = 2
     elif (percentLossAcc < -0.1):
         bucketA = 1
@@ -430,11 +496,11 @@ def evalLabels(label_file, pred_file, model, details):
     bucketJ = 0 # percentLoss >= 0.1 %
     if (percentLossJac < -5):
         bucketJ = 5
-    elif (percentLossJac < -2):
+    elif (percentLossJac < -3):
         bucketJ = 4
-    elif (percentLossJac < -1):
+    elif (percentLossJac < -2):
         bucketJ = 3
-    elif (percentLossJac < -0.5):
+    elif (percentLossJac < -1):
         bucketJ = 2
     elif (percentLossJac < -0.1):
         bucketJ = 1
@@ -522,13 +588,24 @@ def evalBatch(threadNum, details):
     details = sorted(details, key=itemgetter('_id')) 
     for index in range(0, len(labelFiles)):
 
-        cylResults = evalLabels(labelFiles[index], predFilesCyl[index], modelCyl, details[index])
-        salResults = evalLabels(labelFiles[index], predFilesSal[index], modelSal, details[index])
-        spvResults = evalLabels(labelFiles[index], predFilesSpv[index], modelSpv, details[index])
+        # Get the base accuracy for a given scene
+        baseAccuracy = mongoUtil.getBaseAccuracy(details[index]["baseSequence"], details[index]["baseScene"])
 
-        details[index][modelCyl] = cylResults
-        details[index][modelSal] = salResults
-        details[index][modelSpv] = spvResults
+        baseAccuracyAsset = None
+        if "ADD" in details[index]["mutation"]:
+            baseAccuracyAsset = mongoUtil.getBaseAccuracy(details[index]["assetSequence"], details[index]["assetScene"])
+
+        for model in globals.models:
+            # Get the base accuracy for a specific model
+            baseAccModel = baseAccuracy[model]
+            baseAccAssetModel = None
+            if baseAccuracyAsset != None:
+                baseAccAssetModel = baseAccuracyAsset[model]
+            
+            # Get the accuracy differentials
+            modelResults = evalLabels(labelFiles[index], predFilesCyl[index], baseAccModel, baseAccAssetModel, 
+                                        details[index]["typeNum"], details[index]["mutation"])
+            details[index][model] = modelResults
     
 
     # Move to done folder
@@ -679,10 +756,11 @@ def updateFinalDetails(details, finalData):
         for model in globals.models:
 
             # Save top 5 Accuracy
+            percentLossAcc = detail[model]["percentLossAcc"]
 
             # don't have top_acc yet, add it 
             if (len(finalData[model][detail["mutation"]]["top_acc"]) < 5):
-                finalData[model][detail["mutation"]]["top_acc"].append((detail["_id"], detail[model]["accuracyChange"]))
+                finalData[model][detail["mutation"]]["top_acc"].append((detail["_id"], percentLossAcc))
                 finalData[model][detail["mutation"]]["top_acc"].sort(key = lambda x: x[1])
 
             # Do have top_acc check against current highest
@@ -690,8 +768,8 @@ def updateFinalDetails(details, finalData):
                 idRemove = detail["_id"]
                     
                 # new lower change to acc
-                if (finalData[model][detail["mutation"]]["top_acc"][4][1] > detail[model]["accuracyChange"]):
-                    finalData[model][detail["mutation"]]["top_acc"].append((detail["_id"], detail[model]["accuracyChange"]))
+                if (finalData[model][detail["mutation"]]["top_acc"][4][1] > percentLossAcc):
+                    finalData[model][detail["mutation"]]["top_acc"].append((detail["_id"], percentLossAcc))
                     finalData[model][detail["mutation"]]["top_acc"].sort(key = lambda x: x[1])
                     idRemove = finalData[model][detail["mutation"]]["top_acc"].pop()[0]
             
@@ -699,10 +777,11 @@ def updateFinalDetails(details, finalData):
 
 
             # Top Jaccard Change
+            percentLossJac = detail[model]["percentLossJac"]
 
             # don't have top_jacc yet, add it 
-            if (len(finalData[model][detail["mutation"]]["top_jac"]) < 5):
-                finalData[model][detail["mutation"]]["top_jac"].append((detail["_id"], detail[model]["jaccardChange"]))
+            if (len(finalData[model][detail["mutation"]]["top_jac"]) < 10):
+                finalData[model][detail["mutation"]]["top_jac"].append((detail["_id"], percentLossJac))
                 finalData[model][detail["mutation"]]["top_jac"].sort(key = lambda x: x[1])
 
             # Do have top_jacc check against current highest
@@ -710,8 +789,8 @@ def updateFinalDetails(details, finalData):
                 idRemove = detail["_id"]
                 
                 # new lower change to jacc
-                if (finalData[model][detail["mutation"]]["top_jac"][4][1] > detail[model]["jaccardChange"]):
-                    finalData[model][detail["mutation"]]["top_jac"].append((detail["_id"], detail[model]["jaccardChange"]))
+                if (finalData[model][detail["mutation"]]["top_jac"][4][1] > percentLossJac):
+                    finalData[model][detail["mutation"]]["top_jac"].append((detail["_id"], percentLossJac))
                     finalData[model][detail["mutation"]]["top_jac"].sort(key = lambda x: x[1])
                     idRemove = finalData[model][detail["mutation"]]["top_jac"].pop()[0]
             
@@ -719,27 +798,27 @@ def updateFinalDetails(details, finalData):
 
 
             # Accuracy 
-            accChange = detail[model]["accuracyChange"]
+            # accChange = detail[model]["accuracyChange"]
 
             # Update accuracy metrics for all
-            finalData[mutationString]["accuracy"]["all"]["min"] = min(accChange, finalData[mutationString]["accuracy"]["all"]["min"])
-            finalData[mutationString]["accuracy"]["all"]["max"] = max(accChange, finalData[mutationString]["accuracy"]["all"]["max"])
-            finalData[mutationString]["accuracy"]["all"]["avg"] = accChange + finalData[mutationString]["accuracy"]["all"]["avg"]
-            finalData[mutationString]["accuracy"]["all"]["min_" + model] = min(accChange, finalData[mutationString]["accuracy"]["all"]["min_" + model])
-            finalData[mutationString]["accuracy"]["all"]["max_" + model] = max(accChange, finalData[mutationString]["accuracy"]["all"]["max_" + model])
-            finalData[mutationString]["accuracy"]["all"]["avg_" + model] = accChange + finalData[mutationString]["accuracy"]["all"]["avg_" + model]
+            finalData[mutationString]["accuracy"]["all"]["min"] = min(percentLossAcc, finalData[mutationString]["accuracy"]["all"]["min"])
+            finalData[mutationString]["accuracy"]["all"]["max"] = max(percentLossAcc, finalData[mutationString]["accuracy"]["all"]["max"])
+            finalData[mutationString]["accuracy"]["all"]["avg"] = percentLossAcc + finalData[mutationString]["accuracy"]["all"]["avg"]
+            finalData[mutationString]["accuracy"]["all"]["min_" + model] = min(percentLossAcc, finalData[mutationString]["accuracy"]["all"]["min_" + model])
+            finalData[mutationString]["accuracy"]["all"]["max_" + model] = max(percentLossAcc, finalData[mutationString]["accuracy"]["all"]["max_" + model])
+            finalData[mutationString]["accuracy"]["all"]["avg_" + model] = percentLossAcc + finalData[mutationString]["accuracy"]["all"]["avg_" + model]
 
             # Update accuracy metrics for model
             bucketNum = detail[model]["bucketA"]
             bucketKey = "bucket_" + str(bucketNum)
             finalData[mutationString]["accuracy"][bucketKey]["total"] = 1 + finalData[mutationString]["accuracy"][bucketKey]["total"]
             finalData[mutationString]["accuracy"][bucketKey]["total_" + model] = 1 + finalData[mutationString]["accuracy"][bucketKey]["total_" + model]
-            finalData[mutationString]["accuracy"][bucketKey]["min"] = min(accChange, finalData[mutationString]["accuracy"][bucketKey]["min"])
-            finalData[mutationString]["accuracy"][bucketKey]["max"] = max(accChange, finalData[mutationString]["accuracy"][bucketKey]["max"])
-            finalData[mutationString]["accuracy"][bucketKey]["avg"] = accChange + finalData[mutationString]["accuracy"][bucketKey]["avg"]
-            finalData[mutationString]["accuracy"][bucketKey]["min_" + model] = min(accChange, finalData[mutationString]["accuracy"][bucketKey]["min_" + model])
-            finalData[mutationString]["accuracy"][bucketKey]["max_" + model] = max(accChange, finalData[mutationString]["accuracy"][bucketKey]["max_" + model])
-            finalData[mutationString]["accuracy"][bucketKey]["avg_" + model] = accChange + finalData[mutationString]["accuracy"][bucketKey]["avg_" + model]
+            finalData[mutationString]["accuracy"][bucketKey]["min"] = min(percentLossAcc, finalData[mutationString]["accuracy"][bucketKey]["min"])
+            finalData[mutationString]["accuracy"][bucketKey]["max"] = max(percentLossAcc, finalData[mutationString]["accuracy"][bucketKey]["max"])
+            finalData[mutationString]["accuracy"][bucketKey]["avg"] = percentLossAcc + finalData[mutationString]["accuracy"][bucketKey]["avg"]
+            finalData[mutationString]["accuracy"][bucketKey]["min_" + model] = min(percentLossAcc, finalData[mutationString]["accuracy"][bucketKey]["min_" + model])
+            finalData[mutationString]["accuracy"][bucketKey]["max_" + model] = max(percentLossAcc, finalData[mutationString]["accuracy"][bucketKey]["max_" + model])
+            finalData[mutationString]["accuracy"][bucketKey]["avg_" + model] = percentLossAcc + finalData[mutationString]["accuracy"][bucketKey]["avg_" + model]
 
             if (failKeyA[bucketKey] == ""):
                 failKeyA[bucketKey] = model
@@ -747,27 +826,27 @@ def updateFinalDetails(details, finalData):
                 failKeyA[bucketKey] = failKeyA[bucketKey] + "_" + model
 
             # Jaccard 
-            jaccChange = detail[model]["jaccardChange"]
+            # jaccChange = detail[model]["jaccardChange"]
 
             # Update jaccard metrics for all
-            finalData[mutationString]["jaccard"]["all"]["min"] = min(jaccChange, finalData[mutationString]["jaccard"]["all"]["min"])
-            finalData[mutationString]["jaccard"]["all"]["max"] = max(jaccChange, finalData[mutationString]["jaccard"]["all"]["max"])
-            finalData[mutationString]["jaccard"]["all"]["avg"] = jaccChange + finalData[mutationString]["jaccard"]["all"]["avg"]
-            finalData[mutationString]["jaccard"]["all"]["min_" + model] = min(jaccChange, finalData[mutationString]["jaccard"]["all"]["min_" + model])
-            finalData[mutationString]["jaccard"]["all"]["max_" + model] = max(jaccChange, finalData[mutationString]["jaccard"]["all"]["max_" + model])
-            finalData[mutationString]["jaccard"]["all"]["avg_" + model] = jaccChange + finalData[mutationString]["jaccard"]["all"]["avg_" + model]
+            finalData[mutationString]["jaccard"]["all"]["min"] = min(percentLossJac, finalData[mutationString]["jaccard"]["all"]["min"])
+            finalData[mutationString]["jaccard"]["all"]["max"] = max(percentLossJac, finalData[mutationString]["jaccard"]["all"]["max"])
+            finalData[mutationString]["jaccard"]["all"]["avg"] = percentLossJac + finalData[mutationString]["jaccard"]["all"]["avg"]
+            finalData[mutationString]["jaccard"]["all"]["min_" + model] = min(percentLossJac, finalData[mutationString]["jaccard"]["all"]["min_" + model])
+            finalData[mutationString]["jaccard"]["all"]["max_" + model] = max(percentLossJac, finalData[mutationString]["jaccard"]["all"]["max_" + model])
+            finalData[mutationString]["jaccard"]["all"]["avg_" + model] = percentLossJac + finalData[mutationString]["jaccard"]["all"]["avg_" + model]
 
             # Update jaccard metrics for model
             bucketNum = detail[model]["bucketJ"]
             bucketKey = "bucket_" + str(bucketNum)
             finalData[mutationString]["jaccard"][bucketKey]["total"] = 1 + finalData[mutationString]["jaccard"][bucketKey]["total"]
             finalData[mutationString]["jaccard"][bucketKey]["total_" + model] = 1 + finalData[mutationString]["jaccard"][bucketKey]["total_" + model]
-            finalData[mutationString]["jaccard"][bucketKey]["min"] = min(jaccChange, finalData[mutationString]["jaccard"][bucketKey]["min"])
-            finalData[mutationString]["jaccard"][bucketKey]["max"] = max(jaccChange, finalData[mutationString]["jaccard"][bucketKey]["max"])
-            finalData[mutationString]["jaccard"][bucketKey]["avg"] = jaccChange + finalData[mutationString]["jaccard"][bucketKey]["avg"]
-            finalData[mutationString]["jaccard"][bucketKey]["min_" + model] = min(jaccChange, finalData[mutationString]["jaccard"][bucketKey]["min_" + model])
-            finalData[mutationString]["jaccard"][bucketKey]["max_" + model] = max(jaccChange, finalData[mutationString]["jaccard"][bucketKey]["max_" + model])
-            finalData[mutationString]["jaccard"][bucketKey]["avg_" + model] = jaccChange + finalData[mutationString]["jaccard"][bucketKey]["avg_" + model]
+            finalData[mutationString]["jaccard"][bucketKey]["min"] = min(percentLossJac, finalData[mutationString]["jaccard"][bucketKey]["min"])
+            finalData[mutationString]["jaccard"][bucketKey]["max"] = max(percentLossJac, finalData[mutationString]["jaccard"][bucketKey]["max"])
+            finalData[mutationString]["jaccard"][bucketKey]["avg"] = percentLossJac + finalData[mutationString]["jaccard"][bucketKey]["avg"]
+            finalData[mutationString]["jaccard"][bucketKey]["min_" + model] = min(percentLossJac, finalData[mutationString]["jaccard"][bucketKey]["min_" + model])
+            finalData[mutationString]["jaccard"][bucketKey]["max_" + model] = max(percentLossJac, finalData[mutationString]["jaccard"][bucketKey]["max_" + model])
+            finalData[mutationString]["jaccard"][bucketKey]["avg_" + model] = percentLossJac + finalData[mutationString]["jaccard"][bucketKey]["avg_" + model]
             
             if (failKeyJ[bucketKey] == ""):
                 failKeyJ[bucketKey] = model

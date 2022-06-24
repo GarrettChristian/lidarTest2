@@ -120,7 +120,7 @@ def performMutation():
 
         if (globals.assetId != None):
             pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = mongoUtil.getAssetById(globals.assetId)
-        elif ("DEFORM" in mutationSet or "SCALE" in mutationSet):
+        elif ("DEFORM" in mutationSet or "SCALE" in mutationSet or "INTENSITY" in mutationSet):
             # pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = mongoUtil.getRandomAssetOfTypesWithinScene(globals.vehicles, sequence, scene)
             pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = mongoUtil.getRandomAssetOfTypes(globals.vehicles)
         elif (assetLocation == "SIGN"):

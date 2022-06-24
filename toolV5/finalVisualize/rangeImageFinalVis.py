@@ -414,7 +414,7 @@ class LaserScanVis:
     # print(self.img_canvas.size)
     # print(self.img_canvas.pixel_scale)
     # print(np.shape(image))
-    print(self.label_name)
+    # print(self.label_name)
     io.write_png(location, image)
     
 

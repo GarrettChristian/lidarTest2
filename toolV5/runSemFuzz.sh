@@ -29,7 +29,7 @@ scene="000000"
 # assetId="00-000000-1"
 # assetId="00-000156-6"
 # assetId="04-000050-6-moving-car"
-count=2000
+count=100
 batch=100
 
 

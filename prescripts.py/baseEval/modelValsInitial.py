@@ -132,7 +132,7 @@ learning_ignore = { # Ignore classes
 
 
 # https://github.com/PRBonn/semantic-kitti-api/blob/master/evaluate_semantics.py
-def defEval(label_file, pred_file, seq, model):
+def defEval(label_file, pred_file):
 
     print()
     print(label_file)
@@ -143,9 +143,6 @@ def defEval(label_file, pred_file, seq, model):
     # label_file = "/Users/garrettchristian/DocumentsDesktop/uva21/summerProject/lidarTest2/eval/bus.label"
     # pred_file = "/Users/garrettchristian/DocumentsDesktop/uva21/summerProject/lidarTest2/eval/busCy.label"
 
-
-    fileName = basename(label_file)
-    fileName = fileName.replace(".label", "")
 
     numClasses = len(learning_map_inv)
 
@@ -184,16 +181,11 @@ def defEval(label_file, pred_file, seq, model):
 
     # when I am done, print the evaluation
     m_accuracy = evaluator.getacc()
-    m_jaccard, class_jaccard = evaluator.getIoU()
+    m_jaccard, m_jaccard_modified, class_jaccard = evaluator.getIoU()
 
     results = {}
-
-
-    results["_id"] = model + "-" + seq + "-" + fileName
-    results["sequence"] = seq
-    results["scene"] = fileName
-    results["model"] = model
     results["jaccard"] = m_jaccard.item()
+    results["jaccardAlt"] = m_jaccard_modified.item()
     results["accuracy"] = m_accuracy.item()
 
     # print also classwise
@@ -295,13 +287,22 @@ def main():
         predFilesSpv = sorted(predFilesSpv)        
         for index in range(0, len(labelFiles)):
 
-            cyl = defEval(labelFiles[index], predFilesCyl[index], folderNum, "cyl")
-            sal = defEval(labelFiles[index], predFilesSal[index], folderNum, "sal")
-            spv = defEval(labelFiles[index], predFilesSpv[index], folderNum, "spv")
+            fileName = basename(labelFiles[index])
+            fileName = fileName.replace(".label", "")
 
-            add.append(cyl)
-            add.append(sal)
-            add.append(spv)
+            sceneEval = {}
+            sceneEval["_id"] = folderNum + "-" + fileName
+            sceneEval["sequence"] = folderNum
+            sceneEval["scene"] = fileName
+
+            cylRes = defEval(labelFiles[index], predFilesCyl[index])
+            spvRes = defEval(labelFiles[index], predFilesSpv[index])
+            salRes = defEval(labelFiles[index], predFilesSal[index])
+
+            sceneEval["cyl"] = cylRes
+            sceneEval["spv"] = spvRes
+            sceneEval["sal"] = salRes
+            add.append(sceneEval)
 
         mdbCol.insert_many(add)
 

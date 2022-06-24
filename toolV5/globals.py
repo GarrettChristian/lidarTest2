@@ -235,7 +235,9 @@ def prepareMutations(mutationsGiven):
 Setup step to get all potential bin files
 """
 def getBinsLabels(pathVel, pathLabel, sequence, scene):
-    print("Parsing {} bins and {} labels :".format(pathVel, pathLabel))
+    print("Parsing bins and label folders:")
+    print("bins {}".format(pathVel))
+    print("labels {}".format(pathLabel))
     print("Collecting Labels and Bins for sequence {}".format(sequence))
 
     binFilesRun = []
@@ -524,6 +526,10 @@ def init(args):
 
     print("Running Setup")
 
+    batchNum = int(args.b)
+    expectedNum = int(args.count)
+    print("Will run until {} successful mutations are obtained".format({expectedNum}))
+    print("Batch evaluating and saving every {}".format({batchNum}))
 
     # Flags for disabling Saving and evaluation
     saveMutationFlag = args.ns
@@ -549,8 +555,6 @@ def init(args):
     pathLbl = args.lbls
     binFiles, labelFiles = getBinsLabels(args.path, args.lbls, args.seq, args.scene)
 
-    batchNum = int(args.b)
-    expectedNum = int(args.count)
     
     # Specific mutation arguments
     if (args.intensity):
