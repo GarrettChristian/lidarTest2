@@ -51,6 +51,9 @@ def formatSecondsToHhmmss(seconds):
 
 def performMutation():
 
+    # Start timer for the mutation
+    tic = time.perf_counter()
+
     # Select Mutation
     # mutation = random.choice(globals.mutationsEnabled)
     mutation = random.choice(globals.mutationsEnabled)
@@ -213,7 +216,7 @@ def performMutation():
 
         # Color as intensity or label
         colors = np.zeros(np.shape(pcdArr), dtype=np.float64)
-        if ("INTENSITY" in mutationSet or "SCALE" in mutationSet):
+        if ("INTENSITY" in mutationSet):
             colors[:, 2] = intensity
         else:
             for semIdx in range(0, len(semantics)):
@@ -224,16 +227,23 @@ def performMutation():
 
         o3d.visualization.draw_geometries([hull_ls, pcdScene])
 
-
+    
+    # New bin and modified labels
     xyziFinal = None
     labelFinal = None
 
-    
+    # End timer for mutation
+    toc = time.perf_counter()
+    timeSeconds = toc - tic
+    timeFormatted = formatSecondsToHhmmss(timeSeconds)
+    print("Mutation took {}".format(timeFormatted))
 
+    # Combine the xyz, intensity and semantics, instance labels labels and bins
     if (success):
+        details["seconds"] = timeSeconds
+        details["time"] = timeFormatted
         xyziFinal, labelFinal = fileIoUtil.prepareToSave(pcdArr, intensity, semantics, instances)
 
-    
     return success, details, xyziFinal, labelFinal
     
 

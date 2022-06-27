@@ -133,10 +133,10 @@ def createMutationCsv(mutationDataAcc, mutation, accType):
 
     keyCol = ["", "Key", 
             "bucket_0:         x >= -0.1%", 
-            "bucket_1: -0.1% > x >= -0.5%", 
-            "bucket_2: -0.5% > x >= -1%", 
-            "bucket_3:   -1% > x >= -2%",
-            "bucket_4:   -2% > x >= -5%",
+            "bucket_1: -0.1% > x >= -1%", 
+            "bucket_2:   -1% > x >= -2%", 
+            "bucket_3:   -2% > x >= -3%",
+            "bucket_4:   -3% > x >= -5%",
             "bucket_5:   -5% > x"]
     while (len(keyCol) < len(allCol)):
         keyCol.append("")

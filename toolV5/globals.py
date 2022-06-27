@@ -245,12 +245,12 @@ def getBinsLabels(pathVel, pathLabel, sequence, scene):
 
     # Specific Scene
     if (scene):
-        folderNum = str(sequenceNum).rjust(2, '0')
+        folderNum = str(sequence).rjust(2, '0')
         currPathVel = pathVel + folderNum
         currPathLbl = pathLabel + folderNum
 
-        labelFilesRun = [currPathVel + "/labels/" + scene + ".label"]
-        binFilesRun = [currPathLbl + "/velodyne/" + scene + ".bin"]
+        labelFilesRun = [currPathLbl + "/labels/" + scene + ".label"]
+        binFilesRun = [currPathVel + "/velodyne/" + scene + ".bin"]
 
     # Any scene
     else:

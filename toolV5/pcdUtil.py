@@ -1235,13 +1235,17 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, instancesAsset,
     pcdAsset.estimate_normals()
     pcdAsset.orient_normals_towards_camera_location()
 
+    
+    # Check if count of points are greater than allowed to use ball pivoting on
+    if (np.shape(asset)[0] > 10000):
+        print("Point count {} exceeds scale limit {}".format(np.shape(asset)[0], 10000))
+        return False, None, None, None, None, None, None, None, None, None
+    
     # Create a mesh using the ball pivoting method
-    # mesh = None
-    # if (np.shape(asset)[0] < 5000):
-    radii = [0.15, 0.15, 0.15, 0.15]
+    radii = [0.15]
     mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(pcdAsset, o3d.utility.DoubleVector(radii))
 
-    o3d.visualization.draw_geometries([mesh])
+    # o3d.visualization.draw_geometries([mesh])
 
     # Check that the mesh is valid
     if (np.shape(np.array(mesh.vertices))[0] < 1 or np.shape(np.array(mesh.triangles))[0] < 1):
