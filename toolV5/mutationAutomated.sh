@@ -1,3 +1,7 @@
+#!/bin/bash
+
+# -------------------------------------------------------------------------------------------------------------------
+
 
 saveDir="/home/garrett/Documents/savingRuns/runs6_23"
 
@@ -7,12 +11,12 @@ saveDir="/home/garrett/Documents/savingRuns/runs6_23"
 
 # echo "Running Tool"
 
-# mut="SCENE_DEFORM"
-# mut="SCENE_REMOVE"
 # mut="ADD_ROTATE"
 # mut="ADD_MIRROR_ROTATE"
-# mut="SIGN_REPLACE"
+# mut="SCENE_REMOVE"
+# mut="SCENE_DEFORM"
 # mut="SCENE_INTENSITY"
+# mut="SIGN_REPLACE"
 mut="SCENE_SCALE"
 
 velPath="/home/garrett/Documents/data/dataset/sequences/"

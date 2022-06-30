@@ -25,11 +25,15 @@ scene=000159
 seq=02
 scene=001507
 
+seq=01
+scene=000173
+
 
 
 # Specific
-python assetValidDemoV3.py -sequence $seq -scene $scene
+# python assetValidDemoV3.py -sequence $seq -scene $scene
+# python assetValidDemoV4.py -sequence $seq -scene $scene
 
 # Non specific
 # python assetValidDemoV3.py
-
+python assetValidDemoV4.py

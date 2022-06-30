@@ -1,7 +1,4 @@
-
-
-
-
+#!/bin/bash
 
 
 
@@ -9,16 +6,15 @@
 
 # Options
 
-# mut="SCENE_DEFORM"
-# mut="SCENE_MIRROR_ROTATE"
-# mut="SCENE_REMOVE"
 # mut="ADD_ROTATE"
 # mut="ADD_MIRROR_ROTATE"
+# mut="SCENE_REMOVE"
 # mut="SIGN_REPLACE"
-# mut="SCENE_INTENSITY"
-mut="SCENE_SCALE"
+mut="VEHICLE_DEFORM"
+# mut="VEHICLE_INTENSITY"
+# mut="VEHICLE_SCALE"
 
-velPath="/home/garrett/Documents/data/dataset/sequences/"
+binPath="/home/garrett/Documents/data/dataset/sequences/"
 lblPath="/home/garrett/Documents/data/dataset2/sequences/"
 seq="00"
 scene="000000"
@@ -41,12 +37,12 @@ batch=100
 # Run command 
 
 # python semFuzzLidar.py -path "$velPath" -lbls $lblPath
-# python semFuzzLidar.py -path "$velPath" -lbls $lblPath -m $mut -count $count -b $batch -ns -vis
+python semFuzzLidar.py -binPath "$binPath" -labelPath $lblPath -m $mut -count $count -b $batch
 # python semFuzzLidar.py -path "$basePath" -m $mut -vis -ns
 # python semFuzzLidar.py -path "$basePath" -m $mut -seq $seq -scene $scene -ns -vis
 # python semFuzzLidar.py -path "$basePath" -m $mut -seq $seq -scene $scene -ns
 # python semFuzzLidar.py -path "$basePath" -m $mut -seq $seq -scene $scene -vis -assetId $assetId -rotate 323
-python semFuzzLidar.py -path "$velPath" -lbls $lblPath -m $mut -count $count -b $batch -assetId $assetId -rotate 116 -seq $seq -scene $scene
+# python semFuzzLidar.py -path "$velPath" -lbls $lblPath -m $mut -count $count -b $batch -assetId $assetId -rotate 116 -seq $seq -scene $scene
 
 # -------------------------------------------------------------------------------------------------------------------
 

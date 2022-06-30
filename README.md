@@ -4,7 +4,9 @@ Summer Project Repository
 
 ---
 
+## Using the tool
 
+. setup.sh
 
 
 

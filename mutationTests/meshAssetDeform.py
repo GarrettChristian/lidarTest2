@@ -269,10 +269,17 @@ def meshAsset(asset, scene, intensity, semantics, labelsInstance):
     pcdAsset.orient_normals_towards_camera_location()
 
     # mesh, _ = pcdAsset.compute_convex_hull()
-    radii = [0.15, 0.15, 0.15, 0.15]
+    radii = [0.15]
     mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(pcdAsset, o3d.utility.DoubleVector(radii))
 
     mesh.scale(1.2, center=mesh.get_center())
+
+
+
+    mesh = mesh.filter_smooth_simple(number_of_iterations=1)
+    mesh.compute_vertex_normals()
+    # o3d.visualization.draw_geometries([mesh_out])
+
 
 
     legacyMesh = o3d.t.geometry.TriangleMesh.from_legacy(mesh)
@@ -467,10 +474,10 @@ def meshWalls(asset, scene, intensity, semantics, labelsInstance):
 Main Method
 """
 def main():
-    labelsFileName = "/home/garrett/Documents/data/dataset/sequences/00/labels/000001.label"
-    binFileName = "/home/garrett/Documents/data/dataset/sequences/00/velodyne/000001.bin"
-    # labelsFileName = "/Volumes/Extreme SSD/semKitti/dataset/sequences/00/labels/000001.label"
-    # binFileName = "/Volumes/Extreme SSD/semKitti/dataset/sequences/00/velodyne/000001.bin"
+    # labelsFileName = "/home/garrett/Documents/data/dataset/sequences/00/labels/000001.label"
+    # binFileName = "/home/garrett/Documents/data/dataset/sequences/00/velodyne/000001.bin"
+    labelsFileName = "/Volumes/Extreme SSD/semKitti/dataset/sequences/00/labels/000051.label"
+    binFileName = "/Volumes/Extreme SSD/semKitti/dataset/sequences/00/velodyne/000051.bin"
 
     # ------
 
@@ -489,7 +496,7 @@ def main():
 
     # ------
 
-    asset = pcdArr[labelsInstance == 213]
+    asset = pcdArr[labelsInstance == 219]
 
     # alignZdim(asset, pcdArr, intensity, semantics, labelsInstance)
 
