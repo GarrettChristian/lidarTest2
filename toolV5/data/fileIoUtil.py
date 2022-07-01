@@ -32,7 +32,7 @@ def prepareToSave(xyz, intensity, semantics, instances):
 """
 Saves a modified bin file and label file rejoining the intensity 
 """
-def saveToBin(xyzi, labels, saveBinPath, saveLabelPath, fileName):
+def saveBinLabelPair(xyzi, labels, saveBinPath, saveLabelPath, fileName):
     binFile = saveBinPath + fileName + ".bin"
     labelFile = saveLabelPath + fileName + ".label"
 
@@ -44,6 +44,8 @@ def saveToBin(xyzi, labels, saveBinPath, saveLabelPath, fileName):
 
 
 """
+openLabelBin
+For a specific sequence and scene
 Opens a bin and label file splitting between xyz, intensity, semantics, instances 
 """
 def openLabelBin(pathVel, pathLabel, sequence, scene):
@@ -60,6 +62,7 @@ def openLabelBin(pathVel, pathLabel, sequence, scene):
 
 
 """
+openLabelBinFiles
 Opens a bin and label file splitting between xyz, intensity, semantics, instances 
 """
 def openLabelBinFiles(binFile, labelFile):

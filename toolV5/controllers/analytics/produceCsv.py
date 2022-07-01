@@ -87,7 +87,7 @@ def creatAllCol(allData):
 
     return col
 
-def createMutationCsv(mutationDataAcc, mutation, accType, saveAt):
+def createMutationCsv(mutationDataAcc, mutation, accType, saveAt, bucketKeys):
 
     print("Creating csv for {} {}".format(mutation, accType))
 
@@ -123,8 +123,7 @@ def createMutationCsv(mutationDataAcc, mutation, accType, saveAt):
     cols.append(allCol)
 
 
-    for bucketNum in range(0, 6):
-        bucketKey = "bucket_" + str(bucketNum)
+    for bucketKey in bucketKeys:
         bucketCol = creatBucketCol(mutationData[bucketKey], bucketKey)
         cols.append(bucketCol)
 
@@ -220,21 +219,17 @@ def main():
         data = json.load(f)
     print("Final Data Keys: {}".format(data.keys()))
 
-    # Get mutation keys
-    mutationSet = set()
-    for mutation in mutationsEnum.Mutation:
-        mutationSet.add(mutation.name)
-    print("Mutations: {}".format(mutationSet))
+    # Get mutation keys and bucket keys 
+    mutations = data["mutations"]
+    bucketKeys = data["buckets"]
 
     # Create a csv with the data from the final data json run 
-    for key in data.keys():
-        if (key in mutationSet):
-            
-            createMutationCsv(data[key], key, "accuracy", args.saveAt)
-            createMutationCsv(data[key], key, "jaccard", args.saveAt)
-            
-  
+    for mutationKey in mutations:
+        createMutationCsv(data[mutationKey], mutationKey, "accuracy", args.saveAt, bucketKeys)
+        createMutationCsv(data[mutationKey], mutationKey, "jaccard", args.saveAt, bucketKeys)
     
+    
+
 
 if __name__ == '__main__':
     main()

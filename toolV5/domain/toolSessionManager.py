@@ -18,7 +18,7 @@ import domain.mutationsEnum as mutationsEnum
 # --------------------------------------------------------------------------
 
 class SessionManager:
-    def __init__(self, args):
+    def __init__(self, args, recreation=False):
 
         # Run batch id
         self.batchId = str(shortuuid.uuid())
@@ -28,75 +28,97 @@ class SessionManager:
 
         self.binPath = args.binPath
         self.labelPath = args.labelPath
-        
-        # optional to set the bin and label
-        self.scene = args.scene
-        self.sequence = args.seq
 
+        self.assetId = None
+        self.scene = None
+        self.sequence = range(0, 11)
+        if (not recreation):
+      
+            # optional to set the bins and labels to be one specific scene
+            self.scene = args.scene
+            self.sequence = args.seq
+
+        # Get the bins and labels
         self.binFiles = []
         self.labelFiles = []
         self.binFiles, self.labelFiles = self.getBinsLabels()
 
-        # Mutations to choose from
-        print("Selecting mutations to use")
-        self.mutationsEnabled = self.prepareMutations(args.m)
 
-        # Batch and total counts
-        self.batchNum = int(args.b)
-        self.expectedNum = int(args.count)
-        print("Will run until {} successful mutations are obtained".format({self.expectedNum}))
-        print("Batch evaluating and saving every {}".format({self.batchNum}))
-
-        # Specific mutation arguments
-        self.rotation = args.rotate
-        self.mirrorAxis = args.mirror
-        self.intensityChange = args.intensity
-        self.scaleAmount = args.scale
-        self.signChange = args.sign
-        self.deformPercent = args.deformPercent
-        self.deformPoint = args.deformPoint
-        self.deformMu = args.deformMu
-        self.deformSigma = args.deformSigma
-        self.deformSeed = args.deformSeed
-
-
-        # Asset scene mutations
-        self.assetId = args.assetId
-        self.seq = args.seq
-        self.scene = args.scene
 
         # Configurable parameters for the tool
         self.scaleLimit = args.scaleLimit # (10,000 points)
-        self.threads = args.t 
 
-        # Flags for convience 
-        self.saveMutationFlag = args.ns
-        self.evalMutationFlag = args.ne and self.saveMutationFlag
-        if not self.saveMutationFlag:
-            print("Saving disabled")
-        if not self.evalMutationFlag:
-            print("Evaluation disabled")
-        # Flag to use open3d to visualize your changes
+        # Flag to use open3d to visualize the mutation
         self.visualize = args.vis
 
-        # Paths to the directories where specific things are stored
-        self.saveAt = args.saveAt
-        self.stageDir = ""
-        self.dataRoot = ""
-        self.resultDir = ""
-        self.currentVelDir = ""
-        self.doneVelDir = ""
-        self.resultCylDir = ""
-        self.resultSpvDir = ""
-        self.resultSalDir = ""
-        self.evalDir = ""
-        self.doneLabelActualDir = ""
-        self.dataDir = ""
-        self.doneLabelDir = ""
+        # Specific mutation arguments
+        self.rotation = None
+        self.mirrorAxis = None
+        self.intensityChange = None
+        self.scaleAmount = None
+        self.signChange = None
+        self.deformPercent = None
+        self.deformPoint = None
+        self.deformMu = None
+        self.deformSigma = None
+        self.deformSeed = None
 
-        if (self.saveMutationFlag):
-            print("Setting up result folder pipeline")
-            self.setUpDataFolders(self.threads)
+        if (not recreation):
+            # Mutations to choose from
+            print("Selecting mutations to use")
+            self.mutationsEnabled = self.prepareMutations(args.m)
+
+            # Batch and total counts
+            self.batchNum = int(args.b)
+            self.expectedNum = int(args.count)
+            print("Will run until {} successful mutations are obtained".format({self.expectedNum}))
+            print("Batch evaluating and saving every {}".format({self.batchNum}))
+
+            # Specific mutation arguments
+            self.rotation = args.rotate
+            self.mirrorAxis = args.mirror
+            self.intensityChange = args.intensity
+            self.scaleAmount = args.scale
+            self.signChange = args.sign
+            self.deformPercent = args.deformPercent
+            self.deformPoint = args.deformPoint
+            self.deformMu = args.deformMu
+            self.deformSigma = args.deformSigma
+            self.deformSeed = args.deformSeed
+
+            # Specific asset
+            self.assetId = args.assetId
+
+            # Configurable parameters for the tool
+            self.threads = args.t 
+
+            # Flags for convience 
+            self.saveMutationFlag = args.ns
+            self.evalMutationFlag = args.ne and self.saveMutationFlag
+            if not self.saveMutationFlag:
+                print("Saving disabled")
+            if not self.evalMutationFlag:
+                print("Evaluation disabled")
+            
+
+            # Paths to the directories where specific things are stored
+            self.saveAt = args.saveAt
+            self.stageDir = ""
+            self.dataRoot = ""
+            self.resultDir = ""
+            self.currentVelDir = ""
+            self.doneVelDir = ""
+            self.resultCylDir = ""
+            self.resultSpvDir = ""
+            self.resultSalDir = ""
+            self.evalDir = ""
+            self.doneLabelActualDir = ""
+            self.dataDir = ""
+            self.doneLabelDir = ""
+
+            if (self.saveMutationFlag):
+                print("Setting up result folder pipeline")
+                self.setUpDataFolders(self.threads)
 
 
 

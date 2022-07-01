@@ -6,7 +6,7 @@ Handles all database interaction for mutation details
 @Date 6/23/22
 """
 
-from pymongo import MongoClient
+import pymongo
 
 import data.mongoRepository as mongoRepository
 
@@ -34,7 +34,21 @@ class DetailsRepository(mongoRepository.MongoRepository):
         self.mutationCollection.insert_many(mutationDetails)
 
 
+    """
+    Page Request for mutation details
+    Sorted first by time then on _id (in cases there are any duplicate times)
+    
+    https://github.com/nodebe/books_api/blob/main/books_api/books.py
+    https://stackoverflow.com/questions/8109122/how-to-sort-mongodb-with-pymongo
+    """
+    def getMutationDetailsPaged(self, batchId, page, pageLimit):
+        return self.mutationCollection.find({"batchId": batchId}).sort([("time", pymongo.ASCENDING), ("_id", pymongo.ASCENDING)]).skip((page - 1) * pageLimit).limit(pageLimit)
 
+    """
+    Count the details that have a given batchId
+    """
+    def countMutationDetailsBatchId(self, batchId):
+        return self.mutationCollection.count_documents({"batchId": batchId})
 
 
 

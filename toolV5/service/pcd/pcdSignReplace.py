@@ -4,6 +4,7 @@ from enum import Enum
 import numpy as np
 import open3d as o3d
 import random
+import sys
 
 import service.pcd.pcdCommon as pcdCommon
 
@@ -158,6 +159,7 @@ def signReplace(signAsset, intensityAsset, semanticsAsset, instancesAsset,
 
 def getSignMesh(details, signType):
 
+    # Either randomly select sign type or use given sign type
     sign = signType
     if (not signType):
         sign = random.choice(list(Signs))
@@ -170,14 +172,16 @@ def getSignMesh(details, signType):
 
     elif (Signs.STOP.name == sign):
 
+        # Create mesh
         box = o3d.geometry.TriangleMesh.create_box(width=0.05, height=0.75, depth=0.30)
         box2 = o3d.geometry.TriangleMesh.create_box(width=0.05, height=0.30, depth=0.75)
 
+        # Center on top of eachother
         box.translate([0, 0, 0], relative=False)
         box2.translate([0, 0, 0], relative=False)
 
+        # Combine vertices
         signVertices = np.vstack((np.array(box.vertices), np.array(box2.vertices)))
-
         pcdSign = o3d.geometry.PointCloud()
         pcdSign.points = o3d.utility.Vector3dVector(signVertices)
 
@@ -186,25 +190,32 @@ def getSignMesh(details, signType):
 
     elif (Signs.CROSSBUCK.name == sign):
 
+        # Create mesh
         box = o3d.geometry.TriangleMesh.create_box(width=0.05, height=0.22, depth=1.22)
         box2 = o3d.geometry.TriangleMesh.create_box(width=0.05, height=1.22, depth=0.22)
 
+        # Center on top of each other combine
         box.translate([0, 0, 0], relative=False)
         box2.translate([0, 0, 0], relative=False)
-
         signMesh = box + box2
 
-        rotation2 = signMesh.get_rotation_matrix_from_xyz((45, 0, 0))
+        # Rotate 45 degrees
+        radiansRotation = (45 * np.pi) / 180
+        rotation2 = signMesh.get_rotation_matrix_from_xyz((radiansRotation, 0, 0))
         signMesh.rotate(rotation2, center=box.get_center())
 
     elif (Signs.WARNING.name == sign):
 
-        signMesh = o3d.geometry.TriangleMesh.create_box(width=0.05, height=0.76, depth=0.76)    
-        rotation = signMesh.get_rotation_matrix_from_xyz((45, 0, 0))
+        signMesh = o3d.geometry.TriangleMesh.create_box(width=0.05, height=0.76, depth=0.76)
+
+        # Rotate 45 degrees
+        radiansRotation = (45 * np.pi) / 180    
+        rotation = signMesh.get_rotation_matrix_from_xyz((radiansRotation, 0, 0))
         signMesh.rotate(rotation, center=signMesh.get_center())
         
     elif (Signs.YEILD.name == sign):
 
+        # Define points for yeild sign
         yeildPoints = np.array([[0, -0.455, 0.91], 
                             [0, 0, 0.91], 
                             [0, 0.455, 0.91], 

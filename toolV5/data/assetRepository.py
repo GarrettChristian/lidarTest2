@@ -7,6 +7,7 @@ Handles all database interaction for assets
 """
 
 from pymongo import MongoClient
+import numpy as np
 
 import data.fileIoUtil as fileIoUtil
 import data.mongoRepository as mongoRepository
@@ -18,7 +19,7 @@ class AssetRepository(mongoRepository.MongoRepository):
         super(AssetRepository, self).__init__(mongoConnectPath)
         self.binPath = binPath
         self.labelPath = labelPath       
-        self.assetCollection = self.db["assets3"]
+        self.assetCollection = self.db["assets4"]
 
 
 

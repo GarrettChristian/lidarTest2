@@ -24,8 +24,6 @@ Class to represent the final details
 
 finalData {}
     mutation {}
-        count - int
-        count_attempted - int
         accuracy {}
             all {}
                 total - int
@@ -64,23 +62,28 @@ finalData {}
             top_jac [size of top num]
                 (detail _id, - str 
                 percent change - float)
+    count - int
+    count_attempted - int
     seconds - str
     time - float
 """
 class FinalDetails:
-    def __init__(self, batchId, topNum, mutationsEnabled,
-                doneVelDir="", doneLabelDir=""):
+    def __init__(self, batchId, topNum=10, doneVelDir="", doneLabelDir=""):
         self.finalData = {}
         self.batchId = batchId
-        self.mutationsEnabled = mutationsEnabled
+        self.mutationsEnabled = set()
         self.topNum = topNum
         self.buckets = list(range(0, 7))
         self.prepFinalDetails()
 
+        # If removing non top bins/labels
         self.doneVelDir = doneVelDir
         self.doneLabelDir = doneLabelDir
     
 
+    """
+    Defines boundaries for buckets
+    """
     def percentLossToBucket(self, percentLoss):
 
         bucket = 0 # percentLoss >= 0.1 %
@@ -103,8 +106,6 @@ class FinalDetails:
 
     """
     Prepares the final details dictionary preloading some of the keys
-
-    @return finalData dictionary with preloaded keys
     """
     def prepFinalDetails(self):
         self.finalData = {}
@@ -113,77 +114,89 @@ class FinalDetails:
         self.finalData["time"] = int(time.time())
         self.finalData["dateTime"] = time.ctime(time.time())
 
+        self.finalData["mutations"] = []
+
+        self.finalData["buckets"] = []
+        for bucketNum in self.buckets:
+            self.finalData["buckets"].append("bucket_" + str(bucketNum))
+
         # Top to save
         for model in models:
             self.finalData[model] = {}
 
-            for mutation in self.mutationsEnabled:
-                mutationString = mutation.name
-
-                self.finalData[model][mutationString] = {}
-                self.finalData[model][mutationString]["top_acc"] = []
-                self.finalData[model][mutationString]["top_jac"] = []
-
-        # Analysis
-        for mutation in self.mutationsEnabled:
-            mutationString = mutation.name
-            self.finalData[mutationString] = {}
-            self.finalData[mutationString]["accuracy"] = {}
-            self.finalData[mutationString]["jaccard"] = {}
-            for bucketNum in self.buckets:
-                bucketKey = "bucket_" + str(bucketNum)
-                # Accuracy
-                self.finalData[mutationString]["accuracy"][bucketKey] = {}
-                self.finalData[mutationString]["accuracy"][bucketKey]["total"] = 0
-                for model in models:
-                    self.finalData[mutationString]["accuracy"][bucketKey]["total_" + model] = 0
-                    self.finalData[mutationString]["accuracy"][bucketKey]["min_" + model] = sys.maxsize
-                    self.finalData[mutationString]["accuracy"][bucketKey]["max_" + model] = sys.maxsize * -1
-                    self.finalData[mutationString]["accuracy"][bucketKey]["avg_" + model] = 0
-                self.finalData[mutationString]["accuracy"][bucketKey]["min"] = sys.maxsize
-                self.finalData[mutationString]["accuracy"][bucketKey]["max"] = sys.maxsize * -1
-                self.finalData[mutationString]["accuracy"][bucketKey]["avg"] = 0
-                self.finalData[mutationString]["accuracy"][bucketKey]["model_overlap"] = {}
-
-                # Jaccard Accuracy
-                self.finalData[mutationString]["jaccard"][bucketKey] = {}
-                self.finalData[mutationString]["jaccard"][bucketKey]["total"] = 0
-                for model in models:
-                    self.finalData[mutationString]["jaccard"][bucketKey]["total_" + model] = 0
-                    self.finalData[mutationString]["jaccard"][bucketKey]["min_" + model] = sys.maxsize
-                    self.finalData[mutationString]["jaccard"][bucketKey]["max_" + model] = sys.maxsize * -1
-                    self.finalData[mutationString]["jaccard"][bucketKey]["avg_" + model] = 0
-                self.finalData[mutationString]["jaccard"][bucketKey]["min"] = sys.maxsize
-                self.finalData[mutationString]["jaccard"][bucketKey]["max"] = sys.maxsize * -1
-                self.finalData[mutationString]["jaccard"][bucketKey]["avg"] = 0
-                self.finalData[mutationString]["jaccard"][bucketKey]["model_overlap"] = {}
-            
-            # Accuracy
-            self.finalData[mutationString]["accuracy"]["all"] = {}
-            self.finalData[mutationString]["accuracy"]["all"]["total"] = 0
-            self.finalData[mutationString]["accuracy"]["all"]["min"] = sys.maxsize
-            self.finalData[mutationString]["accuracy"]["all"]["max"] = sys.maxsize * -1
-            self.finalData[mutationString]["accuracy"]["all"]["avg"] = 0
-            for model in models:
-                self.finalData[mutationString]["accuracy"]["all"][model] = 0
-                self.finalData[mutationString]["accuracy"]["all"]["min_" + model] = sys.maxsize
-                self.finalData[mutationString]["accuracy"]["all"]["max_" + model] = sys.maxsize * -1
-                self.finalData[mutationString]["accuracy"]["all"]["avg_" + model] = 0
-
-            # Jaccard Accuracy
-            self.finalData[mutationString]["jaccard"]["all"] = {}
-            self.finalData[mutationString]["jaccard"]["all"]["total"] = 0
-            self.finalData[mutationString]["jaccard"]["all"]["min"] = sys.maxsize
-            self.finalData[mutationString]["jaccard"]["all"]["max"] = sys.maxsize * -1
-            self.finalData[mutationString]["jaccard"]["all"]["avg"] = 0
-            for model in models:
-                self.finalData[mutationString]["jaccard"]["all"][model] = 0
-                self.finalData[mutationString]["jaccard"]["all"]["min_" + model] = sys.maxsize
-                self.finalData[mutationString]["jaccard"]["all"]["max_" + model] = sys.maxsize * -1
-                self.finalData[mutationString]["jaccard"]["all"]["avg_" + model] = 0
-
         self.finalData["count"] = 0
         self.finalData["count_attempted"] = 0
+
+
+    """
+    Adds a new mutation to the final details dictionary preloading the keys
+    """
+    def addMutation(self, mutation):
+
+        self.mutationsEnabled.add(mutation)
+        self.finalData["mutations"].append(mutation)
+
+        # Top to save
+        for model in models:
+            self.finalData[model][mutation] = {}
+            self.finalData[model][mutation]["top_acc"] = []
+            self.finalData[model][mutation]["top_jac"] = []
+
+        # Accuracy and Jaccard metrics
+        self.finalData[mutation] = {}
+        self.finalData[mutation]["accuracy"] = {}
+        self.finalData[mutation]["jaccard"] = {}
+        for bucketNum in self.buckets:
+            bucketKey = "bucket_" + str(bucketNum)
+            # Accuracy
+            self.finalData[mutation]["accuracy"][bucketKey] = {}
+            self.finalData[mutation]["accuracy"][bucketKey]["total"] = 0
+            for model in models:
+                self.finalData[mutation]["accuracy"][bucketKey]["total_" + model] = 0
+                self.finalData[mutation]["accuracy"][bucketKey]["min_" + model] = sys.maxsize
+                self.finalData[mutation]["accuracy"][bucketKey]["max_" + model] = sys.maxsize * -1
+                self.finalData[mutation]["accuracy"][bucketKey]["avg_" + model] = 0
+            self.finalData[mutation]["accuracy"][bucketKey]["min"] = sys.maxsize
+            self.finalData[mutation]["accuracy"][bucketKey]["max"] = sys.maxsize * -1
+            self.finalData[mutation]["accuracy"][bucketKey]["avg"] = 0
+            self.finalData[mutation]["accuracy"][bucketKey]["model_overlap"] = {}
+
+            # Jaccard Accuracy
+            self.finalData[mutation]["jaccard"][bucketKey] = {}
+            self.finalData[mutation]["jaccard"][bucketKey]["total"] = 0
+            for model in models:
+                self.finalData[mutation]["jaccard"][bucketKey]["total_" + model] = 0
+                self.finalData[mutation]["jaccard"][bucketKey]["min_" + model] = sys.maxsize
+                self.finalData[mutation]["jaccard"][bucketKey]["max_" + model] = sys.maxsize * -1
+                self.finalData[mutation]["jaccard"][bucketKey]["avg_" + model] = 0
+            self.finalData[mutation]["jaccard"][bucketKey]["min"] = sys.maxsize
+            self.finalData[mutation]["jaccard"][bucketKey]["max"] = sys.maxsize * -1
+            self.finalData[mutation]["jaccard"][bucketKey]["avg"] = 0
+            self.finalData[mutation]["jaccard"][bucketKey]["model_overlap"] = {}
+        
+        # Accuracy
+        self.finalData[mutation]["accuracy"]["all"] = {}
+        self.finalData[mutation]["accuracy"]["all"]["total"] = 0
+        self.finalData[mutation]["accuracy"]["all"]["min"] = sys.maxsize
+        self.finalData[mutation]["accuracy"]["all"]["max"] = sys.maxsize * -1
+        self.finalData[mutation]["accuracy"]["all"]["avg"] = 0
+        for model in models:
+            self.finalData[mutation]["accuracy"]["all"][model] = 0
+            self.finalData[mutation]["accuracy"]["all"]["min_" + model] = sys.maxsize
+            self.finalData[mutation]["accuracy"]["all"]["max_" + model] = sys.maxsize * -1
+            self.finalData[mutation]["accuracy"]["all"]["avg_" + model] = 0
+
+        # Jaccard Accuracy
+        self.finalData[mutation]["jaccard"]["all"] = {}
+        self.finalData[mutation]["jaccard"]["all"]["total"] = 0
+        self.finalData[mutation]["jaccard"]["all"]["min"] = sys.maxsize
+        self.finalData[mutation]["jaccard"]["all"]["max"] = sys.maxsize * -1
+        self.finalData[mutation]["jaccard"]["all"]["avg"] = 0
+        for model in models:
+            self.finalData[mutation]["jaccard"]["all"][model] = 0
+            self.finalData[mutation]["jaccard"]["all"]["min_" + model] = sys.maxsize
+            self.finalData[mutation]["jaccard"]["all"]["max_" + model] = sys.maxsize * -1
+            self.finalData[mutation]["jaccard"]["all"]["avg_" + model] = 0
 
 
 
@@ -204,6 +217,7 @@ class FinalDetails:
         
         for detail in details:
             # Add count for mutation
+            
 
             failKeyA = {}
             failKeyJ = {}
@@ -211,7 +225,11 @@ class FinalDetails:
                 failKeyA["bucket_" + str(bucketNum)] = ""
                 failKeyJ["bucket_" + str(bucketNum)] = ""
 
-            mutationString = detail["mutation"]
+            mutation = detail["mutation"]
+
+            # Validate that the final data has this mutation
+            if mutation not in self.mutationsEnabled:
+                self.addMutation(mutation)
 
             # Check if we have a lower accuracy change for this mutation
             for model in models:
@@ -220,19 +238,19 @@ class FinalDetails:
                 percentLossAcc = detail[model]["percentLossAcc"]
 
                 # don't have top_acc yet, add it 
-                if (len(self.finalData[model][detail["mutation"]]["top_acc"]) < 5):
-                    self.finalData[model][detail["mutation"]]["top_acc"].append((detail["_id"], percentLossAcc))
-                    self.finalData[model][detail["mutation"]]["top_acc"].sort(key = lambda x: x[1])
+                if (len(self.finalData[model][mutation]["top_acc"]) < self.topNum):
+                    self.finalData[model][mutation]["top_acc"].append((detail["_id"], percentLossAcc))
+                    self.finalData[model][mutation]["top_acc"].sort(key = lambda x: x[1])
 
                 # Do have top_acc check against current highest
                 else:
                     idRemove = detail["_id"]
                         
                     # new lower change to acc
-                    if (self.finalData[model][detail["mutation"]]["top_acc"][4][1] > percentLossAcc):
-                        self.finalData[model][detail["mutation"]]["top_acc"].append((detail["_id"], percentLossAcc))
-                        self.finalData[model][detail["mutation"]]["top_acc"].sort(key = lambda x: x[1])
-                        idRemove = self.finalData[model][detail["mutation"]]["top_acc"].pop()[0]
+                    if (self.finalData[model][mutation]["top_acc"][4][1] > percentLossAcc):
+                        self.finalData[model][mutation]["top_acc"].append((detail["_id"], percentLossAcc))
+                        self.finalData[model][mutation]["top_acc"].sort(key = lambda x: x[1])
+                        idRemove = self.finalData[model][mutation]["top_acc"].pop()[0]
                 
                     potentialRemove.add(idRemove)
 
@@ -241,45 +259,44 @@ class FinalDetails:
                 percentLossJac = detail[model]["percentLossJac"]
 
                 # don't have top_jacc yet, add it 
-                if (len(self.finalData[model][detail["mutation"]]["top_jac"]) < 10):
-                    self.finalData[model][detail["mutation"]]["top_jac"].append((detail["_id"], percentLossJac))
-                    self.finalData[model][detail["mutation"]]["top_jac"].sort(key = lambda x: x[1])
+                if (len(self.finalData[model][mutation]["top_jac"]) < self.topNum):
+                    self.finalData[model][mutation]["top_jac"].append((detail["_id"], percentLossJac))
+                    self.finalData[model][mutation]["top_jac"].sort(key = lambda x: x[1])
 
                 # Do have top_jacc check against current highest
                 else:
                     idRemove = detail["_id"]
                     
                     # new lower change to jacc
-                    if (self.finalData[model][detail["mutation"]]["top_jac"][4][1] > percentLossJac):
-                        self.finalData[model][detail["mutation"]]["top_jac"].append((detail["_id"], percentLossJac))
-                        self.finalData[model][detail["mutation"]]["top_jac"].sort(key = lambda x: x[1])
-                        idRemove = self.finalData[model][detail["mutation"]]["top_jac"].pop()[0]
+                    if (self.finalData[model][mutation]["top_jac"][4][1] > percentLossJac):
+                        self.finalData[model][mutation]["top_jac"].append((detail["_id"], percentLossJac))
+                        self.finalData[model][mutation]["top_jac"].sort(key = lambda x: x[1])
+                        idRemove = self.finalData[model][mutation]["top_jac"].pop()[0]
                 
                     potentialRemove.add(idRemove)
 
 
                 # Accuracy 
-                # accChange = detail[model]["accuracyChange"]
 
                 # Update accuracy metrics for all
-                self.finalData[mutationString]["accuracy"]["all"]["min"] = min(percentLossAcc, self.finalData[mutationString]["accuracy"]["all"]["min"])
-                self.finalData[mutationString]["accuracy"]["all"]["max"] = max(percentLossAcc, self.finalData[mutationString]["accuracy"]["all"]["max"])
-                self.finalData[mutationString]["accuracy"]["all"]["avg"] = percentLossAcc + self.finalData[mutationString]["accuracy"]["all"]["avg"]
-                self.finalData[mutationString]["accuracy"]["all"]["min_" + model] = min(percentLossAcc, self.finalData[mutationString]["accuracy"]["all"]["min_" + model])
-                self.finalData[mutationString]["accuracy"]["all"]["max_" + model] = max(percentLossAcc, self.finalData[mutationString]["accuracy"]["all"]["max_" + model])
-                self.finalData[mutationString]["accuracy"]["all"]["avg_" + model] = percentLossAcc + self.finalData[mutationString]["accuracy"]["all"]["avg_" + model]
+                self.finalData[mutation]["accuracy"]["all"]["min"] = min(percentLossAcc, self.finalData[mutation]["accuracy"]["all"]["min"])
+                self.finalData[mutation]["accuracy"]["all"]["max"] = max(percentLossAcc, self.finalData[mutation]["accuracy"]["all"]["max"])
+                self.finalData[mutation]["accuracy"]["all"]["avg"] = percentLossAcc + self.finalData[mutation]["accuracy"]["all"]["avg"]
+                self.finalData[mutation]["accuracy"]["all"]["min_" + model] = min(percentLossAcc, self.finalData[mutation]["accuracy"]["all"]["min_" + model])
+                self.finalData[mutation]["accuracy"]["all"]["max_" + model] = max(percentLossAcc, self.finalData[mutation]["accuracy"]["all"]["max_" + model])
+                self.finalData[mutation]["accuracy"]["all"]["avg_" + model] = percentLossAcc + self.finalData[mutation]["accuracy"]["all"]["avg_" + model]
 
                 # Update accuracy metrics for model
-                bucketNum = detail[model]["bucketA"]
+                bucketNum = self.percentLossToBucket(percentLossAcc)
                 bucketKey = "bucket_" + str(bucketNum)
-                self.finalData[mutationString]["accuracy"][bucketKey]["total"] = 1 + self.finalData[mutationString]["accuracy"][bucketKey]["total"]
-                self.finalData[mutationString]["accuracy"][bucketKey]["total_" + model] = 1 + self.finalData[mutationString]["accuracy"][bucketKey]["total_" + model]
-                self.finalData[mutationString]["accuracy"][bucketKey]["min"] = min(percentLossAcc, self.finalData[mutationString]["accuracy"][bucketKey]["min"])
-                self.finalData[mutationString]["accuracy"][bucketKey]["max"] = max(percentLossAcc, self.finalData[mutationString]["accuracy"][bucketKey]["max"])
-                self.finalData[mutationString]["accuracy"][bucketKey]["avg"] = percentLossAcc + self.finalData[mutationString]["accuracy"][bucketKey]["avg"]
-                self.finalData[mutationString]["accuracy"][bucketKey]["min_" + model] = min(percentLossAcc, self.finalData[mutationString]["accuracy"][bucketKey]["min_" + model])
-                self.finalData[mutationString]["accuracy"][bucketKey]["max_" + model] = max(percentLossAcc, self.finalData[mutationString]["accuracy"][bucketKey]["max_" + model])
-                self.finalData[mutationString]["accuracy"][bucketKey]["avg_" + model] = percentLossAcc + self.finalData[mutationString]["accuracy"][bucketKey]["avg_" + model]
+                self.finalData[mutation]["accuracy"][bucketKey]["total"] = 1 + self.finalData[mutation]["accuracy"][bucketKey]["total"]
+                self.finalData[mutation]["accuracy"][bucketKey]["total_" + model] = 1 + self.finalData[mutation]["accuracy"][bucketKey]["total_" + model]
+                self.finalData[mutation]["accuracy"][bucketKey]["min"] = min(percentLossAcc, self.finalData[mutation]["accuracy"][bucketKey]["min"])
+                self.finalData[mutation]["accuracy"][bucketKey]["max"] = max(percentLossAcc, self.finalData[mutation]["accuracy"][bucketKey]["max"])
+                self.finalData[mutation]["accuracy"][bucketKey]["avg"] = percentLossAcc + self.finalData[mutation]["accuracy"][bucketKey]["avg"]
+                self.finalData[mutation]["accuracy"][bucketKey]["min_" + model] = min(percentLossAcc, self.finalData[mutation]["accuracy"][bucketKey]["min_" + model])
+                self.finalData[mutation]["accuracy"][bucketKey]["max_" + model] = max(percentLossAcc, self.finalData[mutation]["accuracy"][bucketKey]["max_" + model])
+                self.finalData[mutation]["accuracy"][bucketKey]["avg_" + model] = percentLossAcc + self.finalData[mutation]["accuracy"][bucketKey]["avg_" + model]
 
                 if (failKeyA[bucketKey] == ""):
                     failKeyA[bucketKey] = model
@@ -287,27 +304,26 @@ class FinalDetails:
                     failKeyA[bucketKey] = failKeyA[bucketKey] + "_" + model
 
                 # Jaccard 
-                # jaccChange = detail[model]["jaccardChange"]
 
                 # Update jaccard metrics for all
-                self.finalData[mutationString]["jaccard"]["all"]["min"] = min(percentLossJac, self.finalData[mutationString]["jaccard"]["all"]["min"])
-                self.finalData[mutationString]["jaccard"]["all"]["max"] = max(percentLossJac, self.finalData[mutationString]["jaccard"]["all"]["max"])
-                self.finalData[mutationString]["jaccard"]["all"]["avg"] = percentLossJac + self.finalData[mutationString]["jaccard"]["all"]["avg"]
-                self.finalData[mutationString]["jaccard"]["all"]["min_" + model] = min(percentLossJac, self.finalData[mutationString]["jaccard"]["all"]["min_" + model])
-                self.finalData[mutationString]["jaccard"]["all"]["max_" + model] = max(percentLossJac, self.finalData[mutationString]["jaccard"]["all"]["max_" + model])
-                self.finalData[mutationString]["jaccard"]["all"]["avg_" + model] = percentLossJac + self.finalData[mutationString]["jaccard"]["all"]["avg_" + model]
+                self.finalData[mutation]["jaccard"]["all"]["min"] = min(percentLossJac, self.finalData[mutation]["jaccard"]["all"]["min"])
+                self.finalData[mutation]["jaccard"]["all"]["max"] = max(percentLossJac, self.finalData[mutation]["jaccard"]["all"]["max"])
+                self.finalData[mutation]["jaccard"]["all"]["avg"] = percentLossJac + self.finalData[mutation]["jaccard"]["all"]["avg"]
+                self.finalData[mutation]["jaccard"]["all"]["min_" + model] = min(percentLossJac, self.finalData[mutation]["jaccard"]["all"]["min_" + model])
+                self.finalData[mutation]["jaccard"]["all"]["max_" + model] = max(percentLossJac, self.finalData[mutation]["jaccard"]["all"]["max_" + model])
+                self.finalData[mutation]["jaccard"]["all"]["avg_" + model] = percentLossJac + self.finalData[mutation]["jaccard"]["all"]["avg_" + model]
 
                 # Update jaccard metrics for model
-                bucketNum = detail[model]["bucketJ"]
+                bucketNum = self.percentLossToBucket(percentLossJac)
                 bucketKey = "bucket_" + str(bucketNum)
-                self.finalData[mutationString]["jaccard"][bucketKey]["total"] = 1 + self.finalData[mutationString]["jaccard"][bucketKey]["total"]
-                self.finalData[mutationString]["jaccard"][bucketKey]["total_" + model] = 1 + self.finalData[mutationString]["jaccard"][bucketKey]["total_" + model]
-                self.finalData[mutationString]["jaccard"][bucketKey]["min"] = min(percentLossJac, self.finalData[mutationString]["jaccard"][bucketKey]["min"])
-                self.finalData[mutationString]["jaccard"][bucketKey]["max"] = max(percentLossJac, self.finalData[mutationString]["jaccard"][bucketKey]["max"])
-                self.finalData[mutationString]["jaccard"][bucketKey]["avg"] = percentLossJac + self.finalData[mutationString]["jaccard"][bucketKey]["avg"]
-                self.finalData[mutationString]["jaccard"][bucketKey]["min_" + model] = min(percentLossJac, self.finalData[mutationString]["jaccard"][bucketKey]["min_" + model])
-                self.finalData[mutationString]["jaccard"][bucketKey]["max_" + model] = max(percentLossJac, self.finalData[mutationString]["jaccard"][bucketKey]["max_" + model])
-                self.finalData[mutationString]["jaccard"][bucketKey]["avg_" + model] = percentLossJac + self.finalData[mutationString]["jaccard"][bucketKey]["avg_" + model]
+                self.finalData[mutation]["jaccard"][bucketKey]["total"] = 1 + self.finalData[mutation]["jaccard"][bucketKey]["total"]
+                self.finalData[mutation]["jaccard"][bucketKey]["total_" + model] = 1 + self.finalData[mutation]["jaccard"][bucketKey]["total_" + model]
+                self.finalData[mutation]["jaccard"][bucketKey]["min"] = min(percentLossJac, self.finalData[mutation]["jaccard"][bucketKey]["min"])
+                self.finalData[mutation]["jaccard"][bucketKey]["max"] = max(percentLossJac, self.finalData[mutation]["jaccard"][bucketKey]["max"])
+                self.finalData[mutation]["jaccard"][bucketKey]["avg"] = percentLossJac + self.finalData[mutation]["jaccard"][bucketKey]["avg"]
+                self.finalData[mutation]["jaccard"][bucketKey]["min_" + model] = min(percentLossJac, self.finalData[mutation]["jaccard"][bucketKey]["min_" + model])
+                self.finalData[mutation]["jaccard"][bucketKey]["max_" + model] = max(percentLossJac, self.finalData[mutation]["jaccard"][bucketKey]["max_" + model])
+                self.finalData[mutation]["jaccard"][bucketKey]["avg_" + model] = percentLossJac + self.finalData[mutation]["jaccard"][bucketKey]["avg_" + model]
                 
                 if (failKeyJ[bucketKey] == ""):
                     failKeyJ[bucketKey] = model
@@ -315,8 +331,8 @@ class FinalDetails:
                     failKeyJ[bucketKey] = failKeyJ[bucketKey] + "_" + model
 
             # Total count
-            self.finalData[mutationString]["accuracy"]["all"]["total"] = 1 + self.finalData[mutationString]["accuracy"]["all"]["total"]
-            self.finalData[mutationString]["jaccard"]["all"]["total"] = 1 + self.finalData[mutationString]["jaccard"]["all"]["total"]
+            self.finalData[mutation]["accuracy"]["all"]["total"] = 1 + self.finalData[mutation]["accuracy"]["all"]["total"]
+            self.finalData[mutation]["jaccard"]["all"]["total"] = 1 + self.finalData[mutation]["jaccard"]["all"]["total"]
 
             # What model landed in what bucket
             for bucketNum in self.buckets:
@@ -324,23 +340,23 @@ class FinalDetails:
                 # Accuracy 
                 if (failKeyA[bucketKey] != ""):
                     key = failKeyA[bucketKey]
-                    curCount = self.finalData[mutationString]["accuracy"][bucketKey]["model_overlap"].get(key, 0)
-                    self.finalData[mutationString]["accuracy"][bucketKey]["model_overlap"][key] = curCount + 1
+                    curCount = self.finalData[mutation]["accuracy"][bucketKey]["model_overlap"].get(key, 0)
+                    self.finalData[mutation]["accuracy"][bucketKey]["model_overlap"][key] = curCount + 1
                 # Jacc
                 if (failKeyJ[bucketKey] != ""):
                     key = failKeyJ[bucketKey]
-                    curCount = self.finalData[mutationString]["jaccard"][bucketKey]["model_overlap"].get(key, 0)
-                    self.finalData[mutationString]["jaccard"][bucketKey]["model_overlap"][key] = curCount + 1
+                    curCount = self.finalData[mutation]["jaccard"][bucketKey]["model_overlap"].get(key, 0)
+                    self.finalData[mutation]["jaccard"][bucketKey]["model_overlap"][key] = curCount + 1
 
 
         # Remove bin / labels that are not within the top 5
         idInUse = set()
         for mutation in self.mutationsEnabled:
-            mutationString = str(mutation).replace("Mutation.", "")
+            mutation = str(mutation).replace("Mutation.", "")
             for model in models:
-                for detailRecord in self.finalData[model][mutationString]["top_acc"]:
+                for detailRecord in self.finalData[model][mutation]["top_acc"]:
                     idInUse.add(detailRecord[0])
-                for detailRecord in self.finalData[model][mutationString]["top_jac"]:
+                for detailRecord in self.finalData[model][mutation]["top_jac"]:
                     idInUse.add(detailRecord[0])
 
         for idRemove in potentialRemove:
@@ -358,78 +374,85 @@ class FinalDetails:
 
 
 
-
+    """
+    Collects the averages for each mutation and bucket 
+    """
     def finalizeFinalDetails(self):
 
         for mutation in self.mutationsEnabled:
-            mutationString = str(mutation).replace("Mutation.", "")
 
             # Model Avgs
             for model in models:
                 # All model Avgs
-                allCount = self.finalData[mutationString]["accuracy"]["all"]["total"]
+                allCount = self.finalData[mutation]["accuracy"]["all"]["total"]
                 if (allCount > 0):
-                    self.finalData[mutationString]["accuracy"]["all"]["avg_" + model] = self.finalData[mutationString]["accuracy"]["all"]["avg_" + model] / allCount
+                    self.finalData[mutation]["accuracy"]["all"]["avg_" + model] = self.finalData[mutation]["accuracy"]["all"]["avg_" + model] / allCount
 
                 # Bucket model Avgs
                 for bucketNum in self.buckets:
                     bucketKey = "bucket_" + str(bucketNum)
-                    bucketCountModel = self.finalData[mutationString]["accuracy"][bucketKey]["total_" + model]
+                    bucketCountModel = self.finalData[mutation]["accuracy"][bucketKey]["total_" + model]
                     if (bucketCountModel > 0):
-                        self.finalData[mutationString]["accuracy"][bucketKey]["avg_" + model] = self.finalData[mutationString]["accuracy"][bucketKey]["avg_" + model] / bucketCountModel
+                        self.finalData[mutation]["accuracy"][bucketKey]["avg_" + model] = self.finalData[mutation]["accuracy"][bucketKey]["avg_" + model] / bucketCountModel
 
 
                 # All model Jaccard
-                allCount = self.finalData[mutationString]["jaccard"]["all"]["total"]
+                allCount = self.finalData[mutation]["jaccard"]["all"]["total"]
                 if (allCount > 0):
-                    self.finalData[mutationString]["jaccard"]["all"]["avg_" + model] = self.finalData[mutationString]["jaccard"]["all"]["avg_" + model] / allCount
+                    self.finalData[mutation]["jaccard"]["all"]["avg_" + model] = self.finalData[mutation]["jaccard"]["all"]["avg_" + model] / allCount
 
                 # Bucket model Avgs
                 for bucketNum in self.buckets:
                     bucketKey = "bucket_" + str(bucketNum)
-                    bucketCountModel = self.finalData[mutationString]["jaccard"][bucketKey]["total_" + model]
+                    bucketCountModel = self.finalData[mutation]["jaccard"][bucketKey]["total_" + model]
                     if (bucketCountModel > 0):
-                        self.finalData[mutationString]["jaccard"][bucketKey]["avg_" + model] = self.finalData[mutationString]["jaccard"][bucketKey]["avg_" + model] / bucketCountModel
+                        self.finalData[mutation]["jaccard"][bucketKey]["avg_" + model] = self.finalData[mutation]["jaccard"][bucketKey]["avg_" + model] / bucketCountModel
 
 
 
             # Accuracy
 
             # All Avgs
-            allCount = self.finalData[mutationString]["accuracy"]["all"]["total"]
+            allCount = self.finalData[mutation]["accuracy"]["all"]["total"]
             if (allCount > 0):
-                self.finalData[mutationString]["accuracy"]["all"]["avg"] = self.finalData[mutationString]["accuracy"]["all"]["avg"] / allCount
+                self.finalData[mutation]["accuracy"]["all"]["avg"] = self.finalData[mutation]["accuracy"]["all"]["avg"] / allCount
 
             # Bucket Avgs
             for bucketNum in self.buckets:
                 bucketKey = "bucket_" + str(bucketNum)
-                bucketCountAll = self.finalData[mutationString]["accuracy"][bucketKey]["total"]
+                bucketCountAll = self.finalData[mutation]["accuracy"][bucketKey]["total"]
                 if (bucketCountAll > 0):
-                    self.finalData[mutationString]["accuracy"][bucketKey]["avg"] = self.finalData[mutationString]["accuracy"][bucketKey]["avg"] / bucketCountAll
+                    self.finalData[mutation]["accuracy"][bucketKey]["avg"] = self.finalData[mutation]["accuracy"][bucketKey]["avg"] / bucketCountAll
                     
             # Jaccard
 
             # All Avgs
-            allCount = self.finalData[mutationString]["jaccard"]["all"]["total"]
+            allCount = self.finalData[mutation]["jaccard"]["all"]["total"]
             if (allCount > 0):
-                self.finalData[mutationString]["jaccard"]["all"]["avg"] = self.finalData[mutationString]["jaccard"]["all"]["avg"] / allCount
+                self.finalData[mutation]["jaccard"]["all"]["avg"] = self.finalData[mutation]["jaccard"]["all"]["avg"] / allCount
 
             # Bucket Avgs
             for bucketNum in range(0, 6):
                 bucketKey = "bucket_" + str(bucketNum)
-                bucketCountAll = self.finalData[mutationString]["jaccard"][bucketKey]["total"]
+                bucketCountAll = self.finalData[mutation]["jaccard"][bucketKey]["total"]
                 if (bucketCountAll > 0):
-                    self.finalData[mutationString]["jaccard"][bucketKey]["avg"] = self.finalData[mutationString]["jaccard"][bucketKey]["avg"] / bucketCountAll
+                    self.finalData[mutation]["jaccard"][bucketKey]["avg"] = self.finalData[mutation]["jaccard"][bucketKey]["avg"] / bucketCountAll
                     
             
         return self.finalData
 
 
+    """
+    Sets the time for the final details
+    """
     def setTime(self, timeSeconds, timeFormatted):
         self.finalData["seconds"] = timeSeconds
         self.finalData["time"] = timeFormatted
 
 
+    """
+    Sets the attempts for the final details
+    """
     def setAttempts(self, successCount, attemptCount):
         self.finalData["count"] = successCount
         self.finalData["count_attempted"] = attemptCount

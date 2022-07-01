@@ -3,53 +3,61 @@
 # -------------------------------------------------------------------------------------------------------------------
 
 
-saveDir="/home/garrett/Documents/savingRuns/runs6_23"
+saveDir="/home/garrett/Documents/savingRuns/runs6_30"
 
 
 # -------------------------------------------------------------------------------------------------------------------
 
 
-# echo "Running Tool"
+echo "Running Tool"
 
 # mut="ADD_ROTATE"
 # mut="ADD_MIRROR_ROTATE"
 # mut="SCENE_REMOVE"
-# mut="SCENE_DEFORM"
-# mut="SCENE_INTENSITY"
 # mut="SIGN_REPLACE"
-mut="SCENE_SCALE"
+# mut="VEHICLE_DEFORM"
+mut="VEHICLE_INTENSITY"
+# mut="VEHICLE_SCALE"
 
-velPath="/home/garrett/Documents/data/dataset/sequences/"
-lblPath="/home/garrett/Documents/data/dataset2/sequences/"
+binPath="/home/garrett/Documents/data/dataset/sequences/"
+lblPath="/home/garrett/Documents/data/dataset4/sequences/"
 count=2000
-batch=100
+batch=200
 
 
 # Run command 
-python semFuzzLidar.py -path "$velPath" -lbls $lblPath -m $mut -count $count -b $batch
+python semFuzzLidar.py -binPath "$binPath" -labelPath $lblPath -m $mut -count $count -b $batch
+
 
 # -------------------------------------------------------------------------------------------------------------------
 
+
 echo "Running Visulization"
 
-data=/home/garrett/Documents/data/dataset/sequences/
-labels=/home/garrett/Documents/data/resultsBase/
-toolData="/home/garrett/Documents/lidarTest2/toolV5/data/"
+data="/home/garrett/Documents/data/dataset/sequences/"
+labels="/home/garrett/Documents/data/resultsBase/"
+toolData="/home/garrett/Documents/lidarTest2/toolV5/output/"
+mongoconnect="/home/garrett/Documents/lidarTest2/mongoconnect.txt"
+saveAt="/home/garrett/Documents/lidarTest2/toolV5/output"
 
-cd finalVisualize
-python finalVisualization.py -pdata "$data" -plabels "$labels" -ptool "$toolData" 
-cd ..
+
+cd controllers/finalVisualize
+python finalVisualization.py -pdata "$data" -plabels "$labels" -ptool "$toolData" -mdb "$mongoconnect" -saveAt $saveAt
+cd ../..
+
 
 # -------------------------------------------------------------------------------------------------------------------
 
 echo "Running Analytics"
 
-toolData="/home/garrett/Documents/lidarTest2/toolV5/data/"
-dataId="XBR6VmeWt4bLE3Ja6JMQLA"
+toolData="/home/garrett/Documents/lidarTest2/toolV5/output/"
+mongoconnect="/home/garrett/Documents/lidarTest2/mongoconnect.txt"
+saveAt="/home/garrett/Documents/lidarTest2/toolV5/output"
 
-cd analytics
-python produceCsv.py -data "$toolData" 
-cd ..
+
+cd controllers/analytics
+python produceCsv.py -data "$toolData" -mdb "$mongoconnect" -saveAt $saveAt
+cd ../..
 
 # -------------------------------------------------------------------------------------------------------------------
 
@@ -66,12 +74,8 @@ echo "Save at: $newSaveDir"
 
 mkdir $newSaveDir
 
-
-mv analytics/*.csv $newSaveDir
-cp -r finalVisualize/finalvis $newSaveDir
-rm -r finalVisualize/finalvis
-cp -r data $newSaveDir
-rm -r data
+cp -r output $newSaveDir
+rm -r output
 
 # -------------------------------------------------------------------------------------------------------------------
 

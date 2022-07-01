@@ -23,7 +23,7 @@ centerArea = np.array([
 # --------------------------------------------------------------------------
 # Rotation
 
-def mirrorAsset(pcdArrAsset, mirrorAxis, details):
+def mirrorAsset(pcdArrAsset, details, mirrorAxis):
 
     axis = mirrorAxis
     if (not axis):

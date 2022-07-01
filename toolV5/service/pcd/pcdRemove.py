@@ -19,6 +19,7 @@ Then deleteing if the points are found within the polygon
 def replaceBasedOnShadow(asset, scene, intensity, semantics, instances, details):
 
     # Get the objects shadow
+    print(np.shape(asset))
     shadow = pcdCommon.getLidarShadowMesh(asset)
     shadowVertices = np.asarray(shadow.vertices)
     

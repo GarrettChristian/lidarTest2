@@ -122,7 +122,7 @@ https://github.com/PRBonn/semantic-kitti-api/blob/master/evaluate_semantics.py
 @param details dictionary that enumerates what occured in this transformation
 @return results with accuracy results for this model and pair of labels
 """
-def evalLabels(label_file, pred_file, baseAccuracy, baseAccuracyAsset, typeNum, mutation):
+def evalLabels(label_file, pred_file, baseAccuracy, baseAccuracyAsset, typeNum, mutation, assetPoints):
 
     # print()
     # print(label_file)
@@ -212,21 +212,16 @@ def evalLabels(label_file, pred_file, baseAccuracy, baseAccuracyAsset, typeNum, 
                 classNumInv = learning_map_inv[classNum]
                 className = name_label_mapping[classNumInv]
                 baseClassJacc = baseAccuracy[className]
-                # Found some guesses in original of type average between the two 
-                if (classNum == learning_map[typeNum] and baseClassJacc > 0):
+                # Do a weighted average between the two possible options for the class 
+                if (classNum == learning_map[typeNum]):
                     # Replace the asset you added to the scene with the original guess for that class
                     # So if you added a person and originally in the base there was a person 
                     # this should scale if you guessed the class originally 
-                    averageOfClass = (baseAccuracyAsset[typeNameAsset] + baseClassJacc) / 2
-                    jaccardAdd += averageOfClass
-                    results["2" + className] = averageOfClass
-                # Was class 0 in base prediction, likely was not there add from asset prediction jaccard
-                elif (classNum == learning_map[typeNum]): # baseClassJacc == 0
-                    # Replace the asset you added to the scene with the original guess for that class
-                    # So if you added a person and originally in the base there was no person 
-                    # this should scale if you guessed the class originally 
-                    jaccardAdd += baseAccuracyAsset[typeNameAsset]
-                    results["2" + className] = baseAccuracyAsset[typeNameAsset]
+                    classPoints = int(np.sum(label == classNum))
+                    classPointsWithoutAsset = classPoints - assetPoints
+                    weightedAvgOfClass = (baseAccuracyAsset[typeNameAsset] * assetPoints + baseClassJacc * classPointsWithoutAsset) / (classPoints)
+                    jaccardAdd += weightedAvgOfClass
+                    results["2" + className] = weightedAvgOfClass
                 elif (classNum in classesInLabel):
                     jaccardAdd += baseClassJacc
                     results["2" + className] = baseClassJacc
@@ -250,8 +245,9 @@ def evalLabels(label_file, pred_file, baseAccuracy, baseAccuracyAsset, typeNum, 
         for classNum in learning_map_inv.keys():
             if classNum not in ignore:
                 totalClasses += 1
-                classInvName = name_label_mapping[classNum]
-                baseClassJacc = baseAccuracy[classInvName]
+                classNumInv = learning_map_inv[classNum]
+                className = name_label_mapping[classNumInv]
+                baseClassJacc = baseAccuracy[className]
                 if (classNum in classesInLabel):
                     jaccardRemove += baseClassJacc
                 # Add 0 if not found in new label class, this could happen if you remove the only person 
@@ -384,6 +380,7 @@ def evalBatch(threadNum, details, sessionManager):
     predFiles["sal"] = sorted(predFilesSal)    
     details = sorted(details, key=itemgetter('_id')) 
     for index in range(0, len(labelFiles)):
+        print("{}/{}, {}".format(index, len(labelFiles), details[index]["_id"]))
 
         # Get the base accuracy for a given scene
         baseAccuracy = baseAccRepository.getBaseAccuracy(details[index]["baseSequence"], details[index]["baseScene"])
@@ -401,7 +398,7 @@ def evalBatch(threadNum, details, sessionManager):
             
             # Get the accuracy differentials
             modelResults = evalLabels(labelFiles[index], predFiles[model][index], baseAccModel, baseAccAssetModel, 
-                                        details[index]["typeNum"], details[index]["mutation"])
+                                        details[index]["typeNum"], details[index]["mutation"], details[index]["assetPoints"])
             details[index][model] = modelResults
     
 
@@ -425,5 +422,7 @@ def evalBatch(threadNum, details, sessionManager):
 
 
     return details
+
+
 
 

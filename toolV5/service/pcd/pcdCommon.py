@@ -285,10 +285,10 @@ a = line point 1; b = line point 2; c = point to check against.
 """
 def isLeft(lineP1, lineP2, point):
     aX = lineP1[0]
-    bX = lineP2[0]
-    cX = point[0]
     aY = lineP1[1]
+    bX = lineP2[0]    
     bY = lineP2[1]
+    cX = point[0]
     cY = point[1]
     return ((bX - aX) * (cY - aY) - (bY - aY) * (cX - aX)) > 0
 

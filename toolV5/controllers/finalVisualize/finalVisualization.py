@@ -13,7 +13,9 @@ from PIL import ImageFont
 from PIL import ImageDraw 
 
 
-import data.mutationDetailsRepository as mutationDetailsRepository
+from data.mutationDetailsRepository import DetailsRepository
+
+from domain.semanticMapping import color_map_alt_bgr
 
 # --------------------------------------------------------------------------------
 
@@ -29,42 +31,7 @@ models = ["cyl", "spv", "sal"]
 scan = None
 vis = None
 
-color_map_alt = { # bgr
-  0 : [0, 0, 0],
-  1 : [0, 0, 0],
-  10: [245, 150, 100],
-  11: [245, 230, 100],
-  13: [250, 0, 0],
-  15: [150, 60, 30],
-  16: [255, 0, 0],
-  18: [180, 30, 80],
-  20: [255, 0, 0],
-  30: [30, 30, 255],
-  31: [200, 40, 255],
-  32: [90, 30, 150],
-  40: [255, 0, 255],
-  44: [255, 150, 255],
-  48: [75, 0, 75],
-  49: [75, 0, 175],
-  50: [0, 200, 255],
-  51: [50, 120, 255],
-  52: [0, 0, 0],
-  60: [255, 0, 255],
-  70: [0, 175, 0],
-  71: [0, 60, 135],
-  72: [80, 240, 150],
-  80: [150, 240, 255],
-  81: [0, 0, 255],
-  99: [0, 0, 0],
-  252: [245, 150, 100],
-  253: [200, 40, 255],
-  254: [30, 30, 255],
-  255: [90, 30, 150],
-  256: [255, 0, 0],
-  257: [250, 0, 0],
-  258: [180, 30, 80],
-  259: [255, 0, 0],
-}
+
 
 # --------------------------------------------------------------------------------
 
@@ -309,7 +276,7 @@ def main():
     labelsDir = args.plabels
     toolDir = args.ptool
     
-    mutationRepo = mutationDetailsRepository.DetailsRepository(args.mdb)
+    mutationRepo = DetailsRepository(args.mdb)
 
     finalData = {}
     with open(toolDir + "finalData.json") as f:
@@ -318,7 +285,7 @@ def main():
     setUpSaveDir(finalData, args.saveAt)
 
     # Set up visualization
-    color_dict = color_map_alt
+    color_dict = color_map_alt_bgr
     nclasses = len(color_dict)
     scan = SemLaserScan(nclasses, color_dict, project=True)
     vis = LaserScanVis(scan=scan,

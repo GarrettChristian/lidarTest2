@@ -15,9 +15,11 @@ import os
 import time
 import json
 
-import data.assetRepository as assetRepository
-import data.mutationDetailsRepository as mutationDetailsRepository
-import data.finalDataRepository as finalDataRepository
+from threading import Thread
+
+from data.assetRepository import AssetRepository
+from data.mutationDetailsRepository import DetailsRepository
+from data.finalDataRepository import FinalDataRepository
 
 import data.fileIoUtil as fileIoUtil
 
@@ -32,7 +34,7 @@ import service.pcd.pcdRotate as pcdRotate
 import service.pcd.pcdScale as pcdScale
 import service.pcd.pcdSignReplace as pcdSignReplace
 
-import service.eval.finalDetails as finalDetailsClass
+from service.eval.finalDetails import FinalDetails
 import service.eval.eval as eval
 
 
@@ -95,11 +97,11 @@ def performMutation(mutation, assetRepo, sessionManager):
     if (assetLocation == mutationsEnum.AssetLocation.ADD.name):
 
         # Select base scene, given
-        if (sessionManager.sequence != "" and sessionManager.scene != ""):
-            details["baseSequence"] = sessionManager.seq
+        if (sessionManager.scene != None):
+            details["baseSequence"] = sessionManager.sequence
             details["baseScene"] = sessionManager.scene
             pcdArr, intensity, semantics, instances = fileIoUtil.openLabelBin(sessionManager.binPath,  sessionManager.labelPath, 
-                                                                                sessionManager.seq, sessionManager.scene)
+                                                                                sessionManager.sequence, sessionManager.scene)
 
         # Select base scene, random
         else:
@@ -135,7 +137,7 @@ def performMutation(mutation, assetRepo, sessionManager):
             # pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = mongoUtil.getRandomAssetOfTypesWithinScene(globals.vehicles, sequence, scene)
             pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = assetRepo.getRandomAssetOfTypes(semanticMapping.instancesVehicle.keys())
         elif (assetLocation == mutationsEnum.AssetLocation.SIGN.name):
-            pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = assetRepo.getRandomAssetOfTypes([81])
+            pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = assetRepo.getRandomAssetOfType(81)
         else:
             pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = assetRepo.getRandomAsset()
             # pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = mongoUtil.getRandomAssetWithinScene(sequence, scene)
@@ -152,6 +154,10 @@ def performMutation(mutation, assetRepo, sessionManager):
         print("ERROR asset location: {} NOT SUPPORTED".format(assetLocation))
         exit()
 
+
+    
+ 
+
     # Validate the asset was found
     if assetRecord == None:
         print("Invalid Asset / No asset found")
@@ -162,6 +168,7 @@ def performMutation(mutation, assetRepo, sessionManager):
         details["assetSequence"] = assetRecord["sequence"]
         details["assetScene"] = assetRecord["scene"]
         details["assetType"] = assetRecord["type"]
+        details["assetPoints"] = assetRecord["points"]
         details["typeNum"] = assetRecord["typeNum"]
     
     # Perform the mutation
@@ -170,7 +177,7 @@ def performMutation(mutation, assetRepo, sessionManager):
         if success:
         # if (Transformations.INTENSITY == transformation):
             if (mutationSplit[mutationIndex] == mutationsEnum.Transformation.INTENSITY.name):
-                intensityAsset, details = pcdIntensity.intensityChange(intensityAsset, assetRecord["typeNum"], details)
+                intensityAsset, details = pcdIntensity.intensityChange(intensityAsset, assetRecord["typeNum"], details, sessionManager.intensityChange)
                 
             elif (mutationSplit[mutationIndex] == mutationsEnum.Transformation.DEFORM.name):
                 pcdArrAsset, details = pcdDeform.deform(pcdArrAsset, details,
@@ -189,14 +196,14 @@ def performMutation(mutation, assetRepo, sessionManager):
                     combine = False
 
             elif (mutationSplit[mutationIndex] == mutationsEnum.Transformation.MIRROR.name):
-                pcdArrAsset, details = pcdRotate.mirrorAsset(pcdArrAsset, sessionManager.mirrorAxis, details)
+                pcdArrAsset, details = pcdRotate.mirrorAsset(pcdArrAsset, details, sessionManager.mirrorAxis)
 
             elif (mutationSplit[mutationIndex] == mutationsEnum.Transformation.ROTATE.name):
-                success, pcdArrAsset, pcdArr, intensity, semantics, instances, details = pcdRotate.rotate(pcdArr, intensity, semantics, instances, pcdArrAsset, details)
+                success, pcdArrAsset, pcdArr, intensity, semantics, instances, details = pcdRotate.rotate(pcdArr, intensity, semantics, instances, pcdArrAsset, details, sessionManager.rotation)
 
             elif (mutationSplit[mutationIndex] == mutationsEnum.Transformation.REPLACE.name):
                 success, pcdArr, intensity, semantics, instances, pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, details = pcdSignReplace.signReplace(pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, 
-                                                                                                                                                            pcdArr, intensity, semantics, instances, details)
+                                                                                                                                                            pcdArr, intensity, semantics, instances, details, sessionManager.signChange)
             else:
                 print("UNSUPPORTED TRANSFORMATION: {}".format(mutationSplit[mutationIndex]))
 
@@ -257,9 +264,9 @@ def visualize(pcdArrAsset, pcdArr, intensity, semantics, mutationSet):
         colors[:, 2] = intensity
     else:
         for semIdx in range(0, len(semantics)):
-            colors[semIdx][0] = (semanticMapping.color_map_alt[semantics[semIdx]][0] / 255)
-            colors[semIdx][1] = (semanticMapping.color_map_alt[semantics[semIdx]][1] / 255)
-            colors[semIdx][2] = (semanticMapping.color_map_alt[semantics[semIdx]][2] / 255)
+            colors[semIdx][0] = (semanticMapping.color_map_alt_rgb[semantics[semIdx]][0] / 255)
+            colors[semIdx][1] = (semanticMapping.color_map_alt_rgb[semantics[semIdx]][1] / 255)
+            colors[semIdx][2] = (semanticMapping.color_map_alt_rgb[semantics[semIdx]][2] / 255)
     pcdScene.colors = o3d.utility.Vector3dVector(colors)
 
     o3d.visualization.draw_geometries([obb, pcdScene])
@@ -269,21 +276,20 @@ def visualize(pcdArrAsset, pcdArr, intensity, semantics, mutationSet):
 
 def runMutations(sessionManager):
 
-    assetRepo = assetRepository.AssetRepository(sessionManager.binPath, sessionManager.binPath, sessionManager.mongoConnect)
-    detailsRepo = mutationDetailsRepository.DetailsRepository(sessionManager.mongoConnect)
-    finalDataRepo = finalDataRepository.FinalDataRepository(sessionManager.mongoConnect)
+    assetRepo = AssetRepository(sessionManager.binPath, sessionManager.labelPath, sessionManager.mongoConnect)
+    detailsRepo = DetailsRepository(sessionManager.mongoConnect)
+    finalDataRepo = FinalDataRepository(sessionManager.mongoConnect)
 
     threadNum = 0
+    # threadCount = 2
     
-    finalData = finalDetailsClass.FinalDetails(sessionManager.batchId, 10, sessionManager.mutationsEnabled, 
-                                                sessionManager.doneVelDir, sessionManager.doneLabelDir)
+    finalData = FinalDetails(sessionManager.batchId, topNum=10, doneVelDir=sessionManager.doneVelDir, doneLabelDir=sessionManager.doneLabelDir)
 
     errors = []
 
     # Start timer for tool
     ticAll = time.perf_counter() 
 
-    # for num in range (0, globals.iterationNum):
     attemptedNum = 0
     successNum = 0
     while (successNum < sessionManager.expectedNum):
@@ -294,6 +300,9 @@ def runMutations(sessionManager):
         mutationDetails = []
         bins = []
         labels = []
+
+        # threads = []
+        # for thread in range(threadCount):
 
         # Mutate
         # for index in range(0, globals.batchNum):
@@ -321,7 +330,7 @@ def runMutations(sessionManager):
                 bins.append(xyziFinal)
                 labels.append(labelFinal)
 
-        # Save
+        # Save bins & labels
         if (sessionManager.saveMutationFlag):
             # Save folders
             saveVel = sessionManager.stageDir + "/velodyne" + str(threadNum) + "/"
@@ -329,10 +338,8 @@ def runMutations(sessionManager):
 
             # Save bin and labels
             for index in range(0, len(mutationDetails)):
-                fileIoUtil.saveToBin(bins[index], labels[index], saveVel, saveLabel, mutationDetails[index]["_id"])
+                fileIoUtil.saveBinLabelPair(bins[index], labels[index], saveVel, saveLabel, mutationDetails[index]["_id"])
 
-            # Save mutation details
-        
         # Evaluate
         if (sessionManager.evalMutationFlag):
             details = eval.evalBatch(threadNum, mutationDetails, sessionManager)

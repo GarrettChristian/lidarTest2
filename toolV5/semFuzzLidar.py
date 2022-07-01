@@ -6,19 +6,12 @@ Main runner for the mutation tool
 @Date 6/23/22
 """
 
-
-import numpy as np
-import open3d as o3d
-import random
 import argparse
-import shortuuid
 import os
-import time
-import json
 
-import domain.toolSessionManager as toolSessionManager
+from domain.toolSessionManager import SessionManager
+
 import controllers.mutationTool.mutationRunner as mutationRunner
-import controllers.mutationTool.redoMutation as redoMutation
 
 
 # -------------------------------------------------------------
@@ -143,17 +136,6 @@ def parse_args():
         default=None,
         required=False)
 
-
-    # Recreation options
-    p.add_argument("-batchId", 
-        help="Batch to rerun (either batchId or mutationId will override tool)", 
-        default="",
-        required=False)
-
-    p.add_argument("-mutationId", 
-        help="Mutation to rerun (either batchId or mutationId will override tool)", 
-        default="",
-        required=False)
     
     return p.parse_args()
 
@@ -171,19 +153,12 @@ def main():
     args = parse_args()
     
     # Perform the setup creating a session manager
-    sessionManager = toolSessionManager.SessionManager(args)
+    sessionManager = SessionManager(args)
 
     # Start the mutation tool
     print("Starting Mutation")
     try:
-        # Recreate a batch or specific mutation
-        if (args.batchId != ""):
-            redoMutation.batchRecreation(args.batchId, sessionManager)
-        elif (args.mutationId != ""):
-            redoMutation.mutationRecreation(args.mutationId, sessionManager)
-        # Run tool normally
-        else:
-            mutationRunner.runMutations(sessionManager)
+        mutationRunner.runMutations(sessionManager)
 
     except KeyboardInterrupt:
         print("\n--------------------------------------------------------")
