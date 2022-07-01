@@ -57,15 +57,22 @@ def parse_args():
 
     p.add_argument("-t", 
         help="Thread number default to 1", 
-        nargs='?', const=1, default=1)
+        nargs='?', const=2, default=2)
 
     p.add_argument("-scaleLimit", 
         help="Limit to the number of points for scale", 
         nargs='?', const=10000, default=10000)
 
+    p.add_argument('-asyncEval', 
+        help='Seperates the evaluation into its own process',
+        action='store_true', default=False)
+
     # Optional Flags
     p.add_argument('-vis', 
         help='Visualize with Open3D',
+        action='store_true', default=False)
+
+    p.add_argument('-verbose', help='Enables verbose logging',
         action='store_true', default=False)
 
     p.add_argument('-ne', help='Disables Evaluation',

@@ -50,6 +50,7 @@ class SessionManager:
 
         # Flag to use open3d to visualize the mutation
         self.visualize = args.vis
+        self.verbose = False
 
         # Specific mutation arguments
         self.rotation = None
@@ -91,6 +92,8 @@ class SessionManager:
 
             # Configurable parameters for the tool
             self.threads = args.t 
+            self.verbose = args.verbose
+            self.asyncEval = args.asyncEval
 
             # Flags for convience 
             self.saveMutationFlag = args.ns
@@ -195,19 +198,19 @@ class SessionManager:
         """
         /output
             /staging
-                /velodyne0
-                /labels0
+                /velodyne
+                /labels
             /current/dataset/sequences/00
                 /velodyne
             /results
                 /cyl
                 /spv
                 /sal/sequences/00
-            /eval
-                /labels0
-                    /cyl
-                    /spv
-                    /sal
+            # /eval
+            #     /labels
+            #         /cyl
+            #         /spv
+            #         /sal
             /done
                 /velodyne
                 /labels
@@ -236,20 +239,20 @@ class SessionManager:
         if not isExist:
             os.makedirs(self.stageDir)
 
-        for thread in range(0, threads):
-            # staging vel
-            self.stageVel = self.stageDir + "/velodyne" + str(thread)
-            if os.path.exists(self.stageVel):
-                shutil.rmtree(self.stageVel)
-                print("Removing {}".format(self.stageVel))
-            os.makedirs(self.stageVel)
+        # for thread in range(0, threads):
+        # staging vel
+        self.stageVel = self.stageDir + "/velodyne"
+        if os.path.exists(self.stageVel):
+            shutil.rmtree(self.stageVel)
+            print("Removing {}".format(self.stageVel))
+        os.makedirs(self.stageVel)
 
-            # staging label
-            self.stagelabel = self.stageDir + "/labels" + str(thread)
-            if os.path.exists(self.stagelabel):
-                shutil.rmtree(self.stagelabel)
-                print("Removing {}".format(self.stagelabel))
-            os.makedirs(self.stagelabel)
+        # staging label
+        self.stagelabel = self.stageDir + "/labels"
+        if os.path.exists(self.stagelabel):
+            shutil.rmtree(self.stagelabel)
+            print("Removing {}".format(self.stagelabel))
+        os.makedirs(self.stagelabel)
 
         """
         /data
@@ -303,30 +306,30 @@ class SessionManager:
         os.makedirs(self.resultSalDir, exist_ok=True)
 
 
-        """
-        /data
-            /eval
-                /labels0
-                    /cyl
-                    /spv
-                    /sal
-        """
+        # """
+        # /data
+        #     /eval
+        #         /labels0
+        #             /cyl
+        #             /spv
+        #             /sal
+        # """
 
-        # eval
-        self.evalDir = self.dataDir + "/eval"
-        if os.path.exists(self.evalDir):
-            shutil.rmtree(self.evalDir, ignore_errors=True)
-            print("Removing {}".format(self.evalDir))
-        os.makedirs(self.evalDir, exist_ok=True)
+        # # eval
+        # self.evalDir = self.dataDir + "/eval"
+        # if os.path.exists(self.evalDir):
+        #     shutil.rmtree(self.evalDir, ignore_errors=True)
+        #     print("Removing {}".format(self.evalDir))
+        # os.makedirs(self.evalDir, exist_ok=True)
 
-        for thread in range(0, threads):
-            # staging vel
-            labelThreadDir = self.evalDir + "/label" + str(thread)
-            os.makedirs(labelThreadDir)
+        # # for thread in range(0, threads):
+        # # staging vel
+        # labelThreadDir = self.evalDir + "/label"
+        # os.makedirs(labelThreadDir)
 
-            for model in self.models:
-                labelThreadModelDir = labelThreadDir + "/" + model
-                os.makedirs(labelThreadModelDir)
+        # for model in self.models:
+        #     labelThreadModelDir = labelThreadDir + "/" + model
+        #     os.makedirs(labelThreadModelDir)
 
         """
         /data

@@ -12,7 +12,7 @@ import numpy as np
 from os.path import basename
 import shutil
 from operator import itemgetter
-
+import time
 
 import service.eval.ioueval as ioueval
 
@@ -326,10 +326,10 @@ def evalBatch(threadNum, details, sessionManager):
 
     # move the bins to the velodyne folder to run the models on them
     print("move to vel folder")
-    stageVel = sessionManager.stageDir + "/velodyne" + str(threadNum) + "/"
-    allfiles = os.listdir(stageVel)
-    for f in allfiles:
-        shutil.move(stageVel + f, sessionManager.currentVelDir + "/" + f)
+    stageVel = sessionManager.stageDir + "/velodyne/"
+    # allfiles = os.listdir(stageVel)
+    for detail in details:
+        shutil.move(stageVel + detail["_id"] + ".bin", sessionManager.currentVelDir + "/" + detail["_id"] + ".bin")
 
     # run all models on bin files
     print("Run models")
@@ -338,22 +338,22 @@ def evalBatch(threadNum, details, sessionManager):
     runSal(sessionManager)
 
     # Move the model label files to the evaluation folder   
-    print("Move to eval folder")
-    evalCylDir = sessionManager.evalDir + "/label" + str(threadNum) + "/" + modelCyl + "/"
-    evalSpvDir = sessionManager.evalDir + "/label" + str(threadNum) + "/" + modelSpv + "/"
-    evalSalDir = sessionManager.evalDir + "/label" + str(threadNum) + "/" + modelSal + "/"
+    # print("Move to eval folder")
+    # evalCylDir = sessionManager.evalDir + "/label/" + modelCyl + "/"
+    # evalSpvDir = sessionManager.evalDir + "/label/" + modelSpv + "/"
+    # evalSalDir = sessionManager.evalDir + "/label/" + modelSal + "/"
 
-    allfiles = os.listdir(sessionManager.resultCylDir + "/")
-    for f in allfiles:
-        shutil.move(sessionManager.resultCylDir + "/" + f, evalCylDir + f)
+    # allfiles = os.listdir(sessionManager.resultCylDir + "/")
+    # for f in allfiles:
+    #     shutil.move(sessionManager.resultCylDir + "/" + f, evalCylDir + f)
 
-    allfiles = os.listdir(sessionManager.resultSpvDir + "/")
-    for f in allfiles:
-        shutil.move(sessionManager.resultSpvDir + "/" + f, evalSpvDir + f)
+    # allfiles = os.listdir(sessionManager.resultSpvDir + "/")
+    # for f in allfiles:
+    #     shutil.move(sessionManager.resultSpvDir + "/" + f, evalSpvDir + f)
 
-    allfiles = os.listdir(sessionManager.resultSalDir + "/predictions/")
-    for f in allfiles:
-        shutil.move(sessionManager.resultSalDir + "/predictions/" + f, evalSalDir + f)
+    # allfiles = os.listdir(sessionManager.resultSalDir + "/predictions/")
+    # for f in allfiles:
+    #     shutil.move(sessionManager.resultSalDir + "/predictions/" + f, evalSalDir + f)
        
 
     # Move bins to done from the model folder
@@ -366,18 +366,18 @@ def evalBatch(threadNum, details, sessionManager):
 
     # Evaluate 
     print("Eval")
-    stageLabel = sessionManager.stageDir + "/labels" + str(threadNum) + "/"
+    stageLabel = sessionManager.stageDir + "/labels/"
     labelFiles = glob.glob(stageLabel + "*.label")
-    predFilesCyl = glob.glob(evalCylDir + "*.label")
-    predFilesSal = glob.glob(evalSalDir + "*.label")
-    predFilesSpv = glob.glob(evalSpvDir + "*.label")
+    predFilesCyl = glob.glob(sessionManager.resultCylDir + "/" + "*.label")
+    predFilesSal = glob.glob(sessionManager.resultSpvDir + "/" + "*.label")
+    predFilesSpv = glob.glob(sessionManager.resultSalDir + "/predictions/" + "*.label")
     
     # Order the update files cronologically
     labelFiles = sorted(labelFiles)
     predFiles = {}
     predFiles["cyl"] = sorted(predFilesCyl)    
     predFiles["spv"] = sorted(predFilesSpv)        
-    predFiles["sal"] = sorted(predFilesSal)    
+    predFiles["sal"] = sorted(predFilesSal)
     details = sorted(details, key=itemgetter('_id')) 
     for index in range(0, len(labelFiles)):
         print("{}/{}, {}".format(index, len(labelFiles), details[index]["_id"]))
@@ -400,25 +400,31 @@ def evalBatch(threadNum, details, sessionManager):
             modelResults = evalLabels(labelFiles[index], predFiles[model][index], baseAccModel, baseAccAssetModel, 
                                         details[index]["typeNum"], details[index]["mutation"], details[index]["assetPoints"])
             details[index][model] = modelResults
+
+        # Move to done folder
+        shutil.move(labelFiles[index], sessionManager.doneLabelActualDir + "/" + details[index]["_id"] + ".label")
+        shutil.move(predFiles[modelCyl][index], sessionManager.doneLabelDir + "/" + modelCyl + "/" + details[index]["_id"] + ".label")
+        shutil.move(predFiles[modelSpv][index], sessionManager.doneLabelDir + "/" + modelSpv + "/" + details[index]["_id"] + ".label")
+        shutil.move(predFiles[modelSal][index], sessionManager.doneLabelDir + "/" + modelSpv + "/" + details[index]["_id"] + ".label")
     
 
     # Move to done folder
-    print("Move to done folder")    
-    allfiles = os.listdir(stageLabel)
-    for f in allfiles:
-        shutil.move(stageLabel + f, sessionManager.doneLabelActualDir + "/" + f)
+    # print("Move to done folder")    
+    # allfiles = os.listdir(stageLabel)
+    # for f in allfiles:
+        
 
-    allfiles = os.listdir(evalCylDir)
-    for f in allfiles:
-        shutil.move(evalCylDir + f, sessionManager.doneLabelDir + "/" + modelCyl + "/" + f)
+    # allfiles = os.listdir(evalCylDir)
+    # for f in allfiles:
+    #     shutil.move(evalCylDir + f, sessionManager.doneLabelDir + "/" + modelCyl + "/" + f)
 
-    allfiles = os.listdir(evalSpvDir)
-    for f in allfiles:
-        shutil.move(evalSpvDir + f, sessionManager.doneLabelDir + "/" + modelSpv + "/" + f)
+    # allfiles = os.listdir(evalSpvDir)
+    # for f in allfiles:
+    #     shutil.move(evalSpvDir + f, sessionManager.doneLabelDir + "/" + modelSpv + "/" + f)
 
-    allfiles = os.listdir(evalSalDir)
-    for f in allfiles:
-        shutil.move(evalSalDir + f, sessionManager.doneLabelDir + "/" + modelSal + "/" + f)
+    # allfiles = os.listdir(evalSalDir)
+    # for f in allfiles:
+    #     shutil.move(evalSalDir + f, sessionManager.doneLabelDir + "/" + modelSal + "/" + f)
 
 
     return details

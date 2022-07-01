@@ -432,7 +432,7 @@ class FinalDetails:
                 self.finalData[mutation]["jaccard"]["all"]["avg"] = self.finalData[mutation]["jaccard"]["all"]["avg"] / allCount
 
             # Bucket Avgs
-            for bucketNum in range(0, 6):
+            for bucketNum in self.buckets:
                 bucketKey = "bucket_" + str(bucketNum)
                 bucketCountAll = self.finalData[mutation]["jaccard"][bucketKey]["total"]
                 if (bucketCountAll > 0):

@@ -46,7 +46,7 @@ def rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, details, ro
     
     degrees = getValidRotations(pcdArrAsset, pcdArr, semantics)
 
-    print(degrees)
+    # print(degrees)
     
     while (len(degrees) > 0 and attempts < 10 and not success):
             
@@ -59,7 +59,7 @@ def rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, details, ro
             # elif rotateDeg > 360:
             #     rotateDeg = 360
             rotateDeg = random.choice(degrees) 
-        print(rotateDeg)
+        # print(rotateDeg)
         details['rotate'] = rotateDeg
 
         pcdArrAssetNew = pcdCommon.rotatePoints(pcdArrAsset, rotateDeg)
@@ -82,7 +82,7 @@ def rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, details, ro
         # o3d.visualization.draw_geometries([hull_ls, pcdScene])
         
 
-        print("Check on ground")
+        # print("Check on ground")
         maskGround = (semantics == 40) | (semantics == 44) | (semantics == 48) | (semantics == 49) | (semantics == 60) | (semantics == 72)
         if (details["assetType"] == "traffic-sign"):
             maskGround = (semantics == 44) | (semantics == 48) | (semantics == 49) | (semantics == 60) | (semantics == 72)
@@ -90,10 +90,12 @@ def rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, details, ro
         else:
             success = pointsAboveGround(pcdArrAssetNew, pcdArr, maskGround) or pointsWithinDist(pcdArrAssetNew, 5) 
 
-        if (success):
-            print("On correct ground")
+        if (not success):
+            details["issue"] = "Points not on correct ground"
+        else:
+            # print("On correct ground")
 
-            print("align to Z dim")
+            # print("align to Z dim")
             pcdArrAssetNew = alignZdim(pcdArrAssetNew, pcdArr, semantics)
 
             # # Get asset box
@@ -114,17 +116,21 @@ def rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, details, ro
             # o3d.visualization.draw_geometries([hull_ls, pcdScene])
             
 
-            print("Check not in walls")
+            # print("Check not in walls")
             success = not assetIntersectsWalls(pcdArrAssetNew, pcdArr, semantics)
-            if (success):
-                print("Not in walls")
+            if (not success):
+                details["issue"] = "Within the walls"
+            else:
+                # print("Not in walls")
 
-                print("Check unobsuccured")
+                # print("Check unobsuccured")
                 success = assetIsNotObsured(pcdArrAssetNew, pcdArr, semantics)
-                if (success):
-                    print("Asset Unobscured")
+                if (not success):
+                    details["issue"] = "Asset Obscured"
+                else:
+                    # print("Asset Unobscured")
                     pcdArrAsset = pcdArrAssetNew
-                    print("Removing shadow")
+                    # print("Removing shadow")
                     pcdArr, intensity, semantics, labelInstance = removeLidarShadow(pcdArrAssetNew, pcdArr, intensity, semantics, labelInstance)
 
         attempts += 1

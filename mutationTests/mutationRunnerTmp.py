@@ -7,7 +7,6 @@ Main runner for the mutation tool
 """
 
 
-from glob import glob
 import numpy as np
 import open3d as o3d
 import random
@@ -16,9 +15,7 @@ import os
 import time
 import json
 
-# import threading
-from multiprocessing import Process
-from multiprocessing import Queue
+from threading import Thread
 
 from data.assetRepository import AssetRepository
 from data.mutationDetailsRepository import DetailsRepository
@@ -43,17 +40,6 @@ import service.eval.eval as eval
 
 # -------------------------------------------------------------
 
-
-successNum = 0
-attemptedNum = 0
-batchCount = 0
-potentialSuccess = 0
-# finalData = None
-
-
-# -------------------------------------------------------------
-
-
 """
 formatSecondsToHhmmss
 Helper to convert seconds to hours minutes and seconds
@@ -71,7 +57,7 @@ def formatSecondsToHhmmss(seconds):
 # ----------------------------------------------------------
 
 
-def performMutation(mutation, assetRepo, sessionManager, saveVel, saveLabel):
+def performMutation(mutation, assetRepo, sessionManager):
 
     # Start timer for the mutation
     tic = time.perf_counter()
@@ -88,7 +74,7 @@ def performMutation(mutation, assetRepo, sessionManager, saveVel, saveLabel):
     details["mutation"] = mutation
 
     # mutation
-    # print(mutation)
+    print(mutation)
     mutationSplit = mutation.split('_')
     # Asset location
     assetLocation =  mutationSplit[0]
@@ -120,7 +106,7 @@ def performMutation(mutation, assetRepo, sessionManager, saveVel, saveLabel):
         # Select base scene, random
         else:
             idx = random.choice(range(len(sessionManager.labelFiles)))
-            # print(sessionManager.binFiles[idx])
+            print(sessionManager.binFiles[idx])
             head_tail = os.path.split(sessionManager.binFiles[idx])
             scene = head_tail[1]
             scene = scene.replace('.bin', '')
@@ -177,7 +163,7 @@ def performMutation(mutation, assetRepo, sessionManager, saveVel, saveLabel):
         print("Invalid Asset / No asset found")
         success = False
     else:
-        # print(assetRecord)
+        print(assetRecord)
         details["asset"] = assetRecord["_id"]
         details["assetSequence"] = assetRecord["sequence"]
         details["assetScene"] = assetRecord["scene"]
@@ -204,7 +190,7 @@ def performMutation(mutation, assetRepo, sessionManager, saveVel, saveLabel):
                                                                                                                                                             sessionManager.scaleLimit, sessionManager.scaleAmount) 
 
             elif (mutationSplit[mutationIndex] == mutationsEnum.Transformation.REMOVE.name):
-                success, pcdArr, intensity, semantics, instances, details = pcdRemove.replaceBasedOnShadow(pcdArrAsset, pcdArr, intensity, semantics, instances, details)
+                success, pcdArr, intensity, semantics, instances = pcdRemove.replaceBasedOnShadow(pcdArrAsset, pcdArr, intensity, semantics, instances, details)
                 # Don't combine if remove is the last transformation
                 if mutationIndex + 1 == len(mutationSplit):
                     combine = False
@@ -237,7 +223,7 @@ def performMutation(mutation, assetRepo, sessionManager, saveVel, saveLabel):
     toc = time.perf_counter()
     timeSeconds = toc - tic
     timeFormatted = formatSecondsToHhmmss(timeSeconds)
-    # print("Mutation took {}".format(timeFormatted))
+    print("Mutation took {}".format(timeFormatted))
 
     # New bin and modified label to return 
     xyziFinal = None
@@ -247,11 +233,9 @@ def performMutation(mutation, assetRepo, sessionManager, saveVel, saveLabel):
     if (success):
         details["seconds"] = timeSeconds
         details["time"] = timeFormatted
-        if (sessionManager.saveMutationFlag):
-            xyziFinal, labelFinal = fileIoUtil.prepareToSave(pcdArr, intensity, semantics, instances)
-            fileIoUtil.saveBinLabelPair(xyziFinal, labelFinal, saveVel, saveLabel, details["_id"])
+        xyziFinal, labelFinal = fileIoUtil.prepareToSave(pcdArr, intensity, semantics, instances)
 
-    return success, details
+    return success, details, xyziFinal, labelFinal
     
 
 """
@@ -289,98 +273,25 @@ def visualize(pcdArrAsset, pcdArr, intensity, semantics, mutationSet):
 
 
 
-# def batchMutation(threadNum, mutex, sessionManager, mutationDetails, bins, labels, assetRepo):
-def batchMutation(threadNum, sessionManager, mutationDetails, bins, labels, assetRepo, saveVel, saveLabel):
-    global successNum
-    global attemptedNum
-    global batchCount
-    global potentialSuccess
-
-    # mutex.acquire()
-    print("Starting {} Thread Num, saving at {}".format(threadNum, saveLabel))
-
-    while(batchCount + potentialSuccess < sessionManager.batchNum and successNum + potentialSuccess < sessionManager.expectedNum):
-        potentialSuccess += 1
-        # mutex.release()
-
-        mutationEnum = random.choice(sessionManager.mutationsEnabled)
-        mutation = mutationEnum.name
-        
-        success = False
-        success, details = performMutation(mutation, assetRepo, sessionManager, saveVel, saveLabel)
-
-        # mutex.acquire()
-        potentialSuccess -= 1
-        if success:
-            # print("\n\nThread {}, Attempt {} (successful) [curr successful {}]".format(threadNum, attemptedNum, successNum))
-            # print(details)
-            attemptedNum += 1
-            batchCount += 1
-            successNum += 1
-            mutationDetails.append(details)
-            # bins.append(xyziFinal)
-            # labels.append(labelFinal)
-        # else:
-        #     print("\n\nThread {}, Attempt {} (unsuccessful) [curr successful {}]".format(threadNum, attemptedNum, successNum))
-        #     print(details)
-    
-    # mutex.release()
-
-
-
-def evalBatch(sessionManager, mutationDetails, threadNum, finalData, queue):
-
-    detailsRepo = DetailsRepository(sessionManager.mongoConnect)
-
-
-    # Evaluate
-    if (sessionManager.evalMutationFlag):
-        details = eval.evalBatch(threadNum, mutationDetails, sessionManager)
-        deleteFiles = finalData.updateFinalDetails(details)
-        fileIoUtil.removeFiles(deleteFiles)
-
-    # Save details
-    if (sessionManager.saveMutationFlag):
-        detailsRepo.saveMutationDetails(mutationDetails)
-    
-    ret = queue.get()
-    ret['finalData'] = finalData
-    queue.put(ret)
-
-
 
 def runMutations(sessionManager):
-    global successNum
-    global attemptedNum
-    global batchCount
-    global potentialSuccess
-    # global finalData
 
     assetRepo = AssetRepository(sessionManager.binPath, sessionManager.labelPath, sessionManager.mongoConnect)
     detailsRepo = DetailsRepository(sessionManager.mongoConnect)
     finalDataRepo = FinalDataRepository(sessionManager.mongoConnect)
 
     threadNum = 0
-    threadCount = 3
+    # threadCount = 2
     
     finalData = FinalDetails(sessionManager.batchId, topNum=10, doneVelDir=sessionManager.doneVelDir, doneLabelDir=sessionManager.doneLabelDir)
 
     errors = []
-
-    
-    # muti processing 
-    ret = {}
-    ret["finalData"] = finalData
-    queue = Queue()
-    queue.put(ret)
-
 
     # Start timer for tool
     ticAll = time.perf_counter() 
 
     attemptedNum = 0
     successNum = 0
-    processList = []
     while (successNum < sessionManager.expectedNum):
 
         # Start timer for batch
@@ -390,58 +301,72 @@ def runMutations(sessionManager):
         bins = []
         labels = []
 
-        # threadList = []
-        batchCount = 0
-        # potentialSuccess = 0
-        # mutex = threading.Lock()
-        # for n in range(threadCount):
-        #     thread = threading.Thread(target=batchMutation, args=(n, mutex, sessionManager, mutationDetails, bins, labels, assetRepo,))
-        #     threadList.append(thread)
-        #     thread.start()
-
-        # for thread in threadList:
-        #     thread.join()
-
-        threadNum = (threadNum + 1) % 2
-        saveVel = sessionManager.stageDir + "/velodyne/"
-        saveLabel = sessionManager.stageDir + "/labels/"
-
-        batchMutation(0, sessionManager, mutationDetails, bins, labels, assetRepo, saveVel, saveLabel)
-
-        # End timer for mutation batch generation
-        toc = time.perf_counter()
-        timeSeconds = toc - tic
-        timeFormatted = formatSecondsToHhmmss(timeSeconds)
-        # print("Batch took {}".format(timeFormatted))
+        # threads = []
+        # for thread in range(threadCount):
 
         # Mutate
         # for index in range(0, globals.batchNum):
+        batchCount = 0
+        while(batchCount < sessionManager.batchNum and successNum < sessionManager.expectedNum):
+            mutationEnum = random.choice(sessionManager.mutationsEnabled)
+            mutation = mutationEnum.name
+            attemptedNum += 1
+            print("\n\nAttempt {}. [curr successful {}]".format(attemptedNum, successNum))
 
-        if (sessionManager.asyncEval):
-            for process in processList:
-                process.join()
-            ret = queue.get()
-            finalData = ret["finalData"]
-            queue.put(ret)
+            success = False
+            success, details, xyziFinal, labelFinal = performMutation(mutation, assetRepo, sessionManager)
+            # try:
+            #     success, details, xyziFinal, labelFinal = performMutation()
+            # except Exception as e:
+            #     print("\n\n\n ERROR IN PERFORM MUTATION \n\n\n")
+            #     print(e)
+            #     print("\n\n")
+            #     errors.append(e)
 
-            evalNum = threadNum
-            # thread = threading.Thread(target=evalBatch, args=(sessionManager, mutationDetails, bins, labels, evalNum, detailsRepo))
-            process = Process(target=evalBatch, args=(sessionManager, mutationDetails, evalNum, finalData, queue))
-            processList = [process]
-            process.start()
-        else:
-            evalBatch(sessionManager, mutationDetails, 0, finalData, queue)
+            if success:
+                batchCount += 1
+                successNum += 1
+                mutationDetails.append(details)
+                bins.append(xyziFinal)
+                labels.append(labelFinal)
 
-        # evalBatch(sessionManager, mutationDetails)
+        # Save bins & labels
+        if (sessionManager.saveMutationFlag):
+            # Save folders
+            saveVel = sessionManager.stageDir + "/velodyne" + str(threadNum) + "/"
+            saveLabel = sessionManager.stageDir + "/labels" + str(threadNum) + "/"
 
-    if (sessionManager.asyncEval):
-        # Wait on last Eval batch
-        for process in processList:
-            process.join()
-        ret = queue.get()
-        finalData = ret["finalData"]
+            # Save bin and labels
+            for index in range(0, len(mutationDetails)):
+                fileIoUtil.saveBinLabelPair(bins[index], labels[index], saveVel, saveLabel, mutationDetails[index]["_id"])
 
-        
+        # Evaluate
+        if (sessionManager.evalMutationFlag):
+            details = eval.evalBatch(threadNum, mutationDetails, sessionManager)
+            deleteFiles = finalData.updateFinalDetails(details)
+            fileIoUtil.removeFiles(deleteFiles)
+
+        # Save details
+        if (sessionManager.saveMutationFlag):
+            # detailsToSave = []
+            # for detail in mutationDetails:
+            #     buckets = 0
+            #     for model in globals.models:
+            #         buckets += detail[model]["bucketA"]
+            #         buckets += detail[model]["bucketJ"]
+                        
+            #     if (buckets > 0):
+            #         detailsToSave.append(detail)
+
+            # if (len(detailsToSave) > 0):
+            detailsRepo.saveMutationDetails(mutationDetails)
+
+
+        # End timer for batch
+        toc = time.perf_counter()
+        timeSeconds = toc - tic
+        timeFormatted = formatSecondsToHhmmss(timeSeconds)
+        print("Batch took {}".format(timeFormatted))
 
 
     # Final Items

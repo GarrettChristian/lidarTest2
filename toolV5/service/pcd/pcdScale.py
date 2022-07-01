@@ -24,8 +24,9 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, instancesAsset,
     
     # Check if count of points are greater than allowed to use ball pivoting on
     if (np.shape(asset)[0] > scaleLimit):
-        print("Point count {} exceeds scale point limit {}".format(np.shape(asset)[0], scaleLimit))
-        return False, None, None, None, None, None, None, None, None, None
+        # print("Point count {} exceeds scale point limit {}".format(np.shape(asset)[0], scaleLimit))
+        details["issue"] = "Point count {} exceeds scale point limit {}".format(np.shape(asset)[0], scaleLimit)
+        return False, None, None, None, None, None, None, None, None, details
     
     # Create a mesh using the ball pivoting method
     radii = [0.15]
@@ -35,8 +36,9 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, instancesAsset,
 
     # Check that the mesh is valid
     if (np.shape(np.array(mesh.vertices))[0] < 1 or np.shape(np.array(mesh.triangles))[0] < 1):
-        print("MESH NOT SUFFICENT: Vertices {} Triangles {}".format(np.shape(np.array(mesh.vertices))[0], np.shape(np.array(mesh.triangles))[0]))
-        return False, None, None, None, None, None, None, None, None, None
+        # print("MESH NOT SUFFICENT: Vertices {} Triangles {}".format(np.shape(np.array(mesh.vertices))[0], np.shape(np.array(mesh.triangles))[0]))
+        details["issue"] = "MESH NOT SUFFICENT: Vertices {} Triangles {}".format(np.shape(np.array(mesh.vertices))[0], np.shape(np.array(mesh.triangles))[0])
+        return False, None, None, None, None, None, None, None, None, details
     
     # Smooth the mesh
     mesh = mesh.filter_smooth_simple(number_of_iterations=1)
@@ -59,8 +61,9 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, instancesAsset,
     sceneRays.add_triangles(legacyMesh)
 
     if (np.shape(scene)[0] < 1 or np.shape(asset)[0] < 1):
-        print("SCENE or ASSET PROVIDED EMPTY: SCENE {}, ASSET {}".format(np.shape(scene)[0], np.shape(asset)[0]))
-        return False, None, None, None, None, None, None, None, None, None
+        # print("SCENE or ASSET PROVIDED EMPTY: SCENE {}, ASSET {}".format(np.shape(scene)[0], np.shape(asset)[0]))
+        details["issue"] = "SCENE or ASSET PROVIDED EMPTY: SCENE {}, ASSET {}".format(np.shape(scene)[0], np.shape(asset)[0])
+        return False, None, None, None, None, None, None, None, None, details
 
     raysVectorsScene = []
     for point in scene:
@@ -103,12 +106,13 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, instancesAsset,
     newSemanticsAsset = semanticsAsset[hit.numpy()]
     newInstancesAsset = instancesAsset[hit.numpy()]
 
-    print(len(newAsset))
-    print(len(newAssetScene))
+    # print(len(newAsset))
+    # print(len(newAssetScene))
 
     if len(newAsset) == 0 or len(newAssetScene) == 0:
-        print("GOT NONE OF THE OG ASSET {} OR NONE OF SCENE {}".format(len(newAsset), len(newAssetScene)))
-        return False, None, None, None, None, None, None, None, None, None
+        # print("GOT NONE OF THE OG ASSET {} OR NONE OF SCENE {}".format(len(newAsset), len(newAssetScene)))
+        details["issue"] = "GOT NONE OF THE OG ASSET {} OR NONE OF SCENE {}".format(len(newAsset), len(newAssetScene))
+        return False, None, None, None, None, None, None, None, None, details
 
     # Fix the intensity of each of the points in the scene that were pulled into the asset by using the closest scaled asset point
     pcd_tree = o3d.geometry.KDTreeFlann(scaledPoints)
@@ -124,8 +128,9 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, instancesAsset,
 
     # print(np.shape(newAsset))
     if (np.shape(newAsset)[0] < 20):
-        print("New asset too little points {}".format(np.shape(newAsset)[0]))
-        return False, None, None, None, None, None, None, None, None, None
+        # print("New asset too little points {}".format(np.shape(newAsset)[0]))
+        details["issue"] = "New asset too little points {}".format(np.shape(newAsset)[0])
+        return False, None, None, None, None, None, None, None, None, details
 
 
     # Return revised scene with scaled vehicle 

@@ -61,7 +61,8 @@ def signReplace(signAsset, intensityAsset, semanticsAsset, instancesAsset,
 
     # Validate that there are enough points to make a hull from
     if (np.shape(pole)[0] < 5 or np.shape(sign)[0] < 5):
-        print("Sign {} pole {}, too little points".format(np.shape(sign)[0], np.shape(pole)[0]))
+        # print("Sign {} pole {}, too little points".format(np.shape(sign)[0], np.shape(pole)[0]))
+        details["issue"] = "Sign {} pole {}, too little points".format(np.shape(sign)[0], np.shape(pole)[0])
         return False, None, None, None, None, None, None, None, None, details
     
     # Get the bounding box for both the sign and pole
@@ -102,13 +103,15 @@ def signReplace(signAsset, intensityAsset, semanticsAsset, instancesAsset,
     
     # Validate that the sign is not too low to the ground
     if (minZSign < -1):
-        print("Sign too low min {}".format(minZSign))
+        # print("Sign too low min {}".format(minZSign))
+        details["issue"] = "Sign too low min {}".format(minZSign)
         return False, None, None, None, None, None, None, None, None, details
 
     # Validate that the og sign and new sign are roughly the same size
     meshLen = np.linalg.norm(meshMin - meshMin)
     if (np.absolute(meshLen - signLen) > 2):
-        print("Distance to sign too great: mesh len {}, sign len {}".format(meshLen, signLen))
+        # print("Distance to sign too great: mesh len {}, sign len {}".format(meshLen, signLen))
+        details["issue"] = "Distance to sign too great: mesh len {}, sign len {}".format(meshLen, signLen)
         return False, None, None, None, None, None, None, None, None, details
 
 
@@ -142,14 +145,15 @@ def signReplace(signAsset, intensityAsset, semanticsAsset, instancesAsset,
     # Pull the points in the scene to the new sign mesh
     assetData = (sign, intensitySign, semanticsSign, instancesSign)
     sceneData = (scene, intensity, semantics, instances)
-    success, newAssetData, newSceneData = pointsToMesh(signMesh, assetData, sceneData)
+    success, newAssetData, newSceneData, details = pointsToMesh(signMesh, assetData, sceneData, details)
 
     sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, instancesNonIntersect = newSceneData
     sign, intensitySign, semanticsSign, instancesSign = newAssetData
 
     # Validate that the sign has points
     if (success and np.shape(sign)[0] < 15):
-        print("Sign too little points")
+        # print("Sign too little points")
+        details["issue"] = "Sign too little points {}".format(np.shape(sign)[0])
         success = False
 
     return success, sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, instancesNonIntersect, sign, intensitySign, semanticsSign, instancesSign, details
@@ -244,7 +248,7 @@ def getSignMesh(details, signType):
 
 
 
-def pointsToMesh(mesh, assetData, sceneData):
+def pointsToMesh(mesh, assetData, sceneData, details):
 
     asset, intensityAsset, semanticsAsset, instancesAsset = assetData
     scene, intensity, semantics, instances = sceneData
@@ -256,8 +260,9 @@ def pointsToMesh(mesh, assetData, sceneData):
     sceneRays.add_triangles(legacyMesh)
 
     if (np.shape(scene)[0] < 1 or np.shape(asset)[0] < 1):
-        print("SCENE or ASSET PROVIDED EMPTY: SCENE {}, ASSET {}".format(np.shape(scene)[0], np.shape(asset)[0]))
-        return False, (None, None, None, None), (None, None, None, None)
+        # print("SCENE or ASSET PROVIDED EMPTY: SCENE {}, ASSET {}".format(np.shape(scene)[0], np.shape(asset)[0]))
+        details["issue"] = "SCENE or ASSET PROVIDED EMPTY: SCENE {}, ASSET {}".format(np.shape(scene)[0], np.shape(asset)[0])
+        return False, (None, None, None, None), (None, None, None, None), details
 
     raysVectorsScene = []
     for point in scene:
@@ -300,12 +305,13 @@ def pointsToMesh(mesh, assetData, sceneData):
     semanticsAsset = semanticsAsset[hit.numpy()]
     instancesAsset = instancesAsset[hit.numpy()]
 
-    print(len(newAsset))
-    print(len(newAssetScene))
+    # print(len(newAsset))
+    # print(len(newAssetScene))
 
     if len(newAsset) == 0 or len(newAssetScene) == 0:
-        print("GOT NONE OF THE OG ASSET {} OR NONE OF SCENE {}".format(len(newAsset), len(newAssetScene)))
-        return False, (None, None, None, None), (None, None, None, None)
+        # print("GOT NONE OF THE OG ASSET {} OR NONE OF SCENE {}".format(len(newAsset), len(newAssetScene)))
+        details["issue"] = "GOT NONE OF THE OG ASSET {} OR NONE OF SCENE {}".format(len(newAsset), len(newAssetScene))
+        return False, (None, None, None, None), (None, None, None, None), details
 
     # Fix the intensity of each of the points in the scene that were pulled into the sign by using the closest sign point
     pcdAssetNearest = o3d.geometry.PointCloud()
@@ -324,6 +330,6 @@ def pointsToMesh(mesh, assetData, sceneData):
     # Return revised scene
     newAssetData = (newAsset, intensityAsset, semanticsAsset, instancesAsset)
     newSceneData = (sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, instancesNonIntersect)
-    return True, newAssetData, newSceneData
+    return True, newAssetData, newSceneData, details
 
 

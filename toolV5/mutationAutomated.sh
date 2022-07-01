@@ -16,13 +16,13 @@ echo "Running Tool"
 # mut="SCENE_REMOVE"
 # mut="SIGN_REPLACE"
 # mut="VEHICLE_DEFORM"
-mut="VEHICLE_INTENSITY"
-# mut="VEHICLE_SCALE"
+# mut="VEHICLE_INTENSITY"
+mut="VEHICLE_SCALE"
 
 binPath="/home/garrett/Documents/data/dataset/sequences/"
 lblPath="/home/garrett/Documents/data/dataset4/sequences/"
 count=2000
-batch=200
+batch=400
 
 
 # Run command 

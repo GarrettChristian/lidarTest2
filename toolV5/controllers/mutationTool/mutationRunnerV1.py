@@ -16,9 +16,7 @@ import os
 import time
 import json
 
-# import threading
-from multiprocessing import Process
-from multiprocessing import Queue
+import threading
 
 from data.assetRepository import AssetRepository
 from data.mutationDetailsRepository import DetailsRepository
@@ -48,7 +46,7 @@ successNum = 0
 attemptedNum = 0
 batchCount = 0
 potentialSuccess = 0
-# finalData = None
+finalData = None
 
 
 # -------------------------------------------------------------
@@ -295,6 +293,7 @@ def batchMutation(threadNum, sessionManager, mutationDetails, bins, labels, asse
     global attemptedNum
     global batchCount
     global potentialSuccess
+    global finalData
 
     # mutex.acquire()
     print("Starting {} Thread Num, saving at {}".format(threadNum, saveLabel))
@@ -312,26 +311,34 @@ def batchMutation(threadNum, sessionManager, mutationDetails, bins, labels, asse
         # mutex.acquire()
         potentialSuccess -= 1
         if success:
-            # print("\n\nThread {}, Attempt {} (successful) [curr successful {}]".format(threadNum, attemptedNum, successNum))
-            # print(details)
+            print("\n\nThread {}, Attempt {} (successful) [curr successful {}]".format(threadNum, attemptedNum, successNum))
+            print(details)
             attemptedNum += 1
             batchCount += 1
             successNum += 1
             mutationDetails.append(details)
             # bins.append(xyziFinal)
             # labels.append(labelFinal)
-        # else:
-        #     print("\n\nThread {}, Attempt {} (unsuccessful) [curr successful {}]".format(threadNum, attemptedNum, successNum))
-        #     print(details)
+        else:
+            print("\n\nThread {}, Attempt {} (unsuccessful) [curr successful {}]".format(threadNum, attemptedNum, successNum))
+            print(details)
     
     # mutex.release()
 
 
 
-def evalBatch(sessionManager, mutationDetails, threadNum, finalData, queue):
+def evalBatch(sessionManager, mutationDetails, bins, labels, threadNum, detailsRepo):
+    global finalData
 
-    detailsRepo = DetailsRepository(sessionManager.mongoConnect)
+    # Save bins & labels
+    # if (sessionManager.saveMutationFlag):
+    #     # Save folders
+    #     saveVel = sessionManager.stageDir + "/velodyne" + str(threadNum) + "/"
+    #     saveLabel = sessionManager.stageDir + "/labels" + str(threadNum) + "/"
 
+    #     # Save bin and labels
+    #     for index in range(0, len(mutationDetails)):
+    #         fileIoUtil.saveBinLabelPair(bins[index], labels[index], saveVel, saveLabel, mutationDetails[index]["_id"])
 
     # Evaluate
     if (sessionManager.evalMutationFlag):
@@ -341,11 +348,18 @@ def evalBatch(sessionManager, mutationDetails, threadNum, finalData, queue):
 
     # Save details
     if (sessionManager.saveMutationFlag):
+        # detailsToSave = []
+        # for detail in mutationDetails:
+        #     buckets = 0
+        #     for model in globals.models:
+        #         buckets += detail[model]["bucketA"]
+        #         buckets += detail[model]["bucketJ"]
+                    
+        #     if (buckets > 0):
+        #         detailsToSave.append(detail)
+
+        # if (len(detailsToSave) > 0):
         detailsRepo.saveMutationDetails(mutationDetails)
-    
-    ret = queue.get()
-    ret['finalData'] = finalData
-    queue.put(ret)
 
 
 
@@ -354,7 +368,7 @@ def runMutations(sessionManager):
     global attemptedNum
     global batchCount
     global potentialSuccess
-    # global finalData
+    global finalData
 
     assetRepo = AssetRepository(sessionManager.binPath, sessionManager.labelPath, sessionManager.mongoConnect)
     detailsRepo = DetailsRepository(sessionManager.mongoConnect)
@@ -368,19 +382,13 @@ def runMutations(sessionManager):
     errors = []
 
     
-    # muti processing 
-    ret = {}
-    ret["finalData"] = finalData
-    queue = Queue()
-    queue.put(ret)
-
 
     # Start timer for tool
     ticAll = time.perf_counter() 
 
     attemptedNum = 0
     successNum = 0
-    processList = []
+    threadList = []
     while (successNum < sessionManager.expectedNum):
 
         # Start timer for batch
@@ -403,8 +411,8 @@ def runMutations(sessionManager):
         #     thread.join()
 
         threadNum = (threadNum + 1) % 2
-        saveVel = sessionManager.stageDir + "/velodyne/"
-        saveLabel = sessionManager.stageDir + "/labels/"
+        saveVel = sessionManager.stageDir + "/velodyne" + str(threadNum) + "/"
+        saveLabel = sessionManager.stageDir + "/labels" + str(threadNum) + "/"
 
         batchMutation(0, sessionManager, mutationDetails, bins, labels, assetRepo, saveVel, saveLabel)
 
@@ -412,34 +420,27 @@ def runMutations(sessionManager):
         toc = time.perf_counter()
         timeSeconds = toc - tic
         timeFormatted = formatSecondsToHhmmss(timeSeconds)
-        # print("Batch took {}".format(timeFormatted))
+        print("Batch took {}".format(timeFormatted))
 
         # Mutate
         # for index in range(0, globals.batchNum):
 
-        if (sessionManager.asyncEval):
-            for process in processList:
-                process.join()
-            ret = queue.get()
-            finalData = ret["finalData"]
-            queue.put(ret)
+        
+        for thread in threadList:
+            thread.join()
 
-            evalNum = threadNum
-            # thread = threading.Thread(target=evalBatch, args=(sessionManager, mutationDetails, bins, labels, evalNum, detailsRepo))
-            process = Process(target=evalBatch, args=(sessionManager, mutationDetails, evalNum, finalData, queue))
-            processList = [process]
-            process.start()
-        else:
-            evalBatch(sessionManager, mutationDetails, 0, finalData, queue)
+        evalNum = threadNum
+        thread = threading.Thread(target=evalBatch, args=(sessionManager, mutationDetails, bins, labels, evalNum, detailsRepo))
+        threadList = [thread]
+        print("STARTING EVAL")
+        thread.start()
+        print("POST START")
 
         # evalBatch(sessionManager, mutationDetails)
 
-    if (sessionManager.asyncEval):
-        # Wait on last Eval batch
-        for process in processList:
-            process.join()
-        ret = queue.get()
-        finalData = ret["finalData"]
+    # Wait on last Eval batch
+    for thread in threadList:
+        thread.join()
 
         
 

@@ -8,10 +8,10 @@
 
 # mut="ADD_ROTATE"
 # mut="ADD_MIRROR_ROTATE"
-mut="SCENE_REMOVE"
+# mut="SCENE_REMOVE"
 # mut="SIGN_REPLACE"
 # mut="VEHICLE_DEFORM"
-# mut="VEHICLE_INTENSITY"
+mut="VEHICLE_INTENSITY"
 # mut="VEHICLE_SCALE"
 
 binPath="/home/garrett/Documents/data/dataset/sequences/"
@@ -34,7 +34,7 @@ assetId="01-000050-1389-traffic-sign"
 # assetId="08-000368-12-other-vehicle"
 # assetId="06-000882-3-truck"
 count=10
-batch=100
+batch=20
 
 
 # -------------------------------------------------------------------------------------------------------------------

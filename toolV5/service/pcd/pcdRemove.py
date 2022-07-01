@@ -19,7 +19,6 @@ Then deleteing if the points are found within the polygon
 def replaceBasedOnShadow(asset, scene, intensity, semantics, instances, details):
 
     # Get the objects shadow
-    print(np.shape(asset))
     shadow = pcdCommon.getLidarShadowMesh(asset)
     shadowVertices = np.asarray(shadow.vertices)
     
@@ -37,8 +36,9 @@ def replaceBasedOnShadow(asset, scene, intensity, semantics, instances, details)
         maskAbove = pcdCommon.checkInclusionBasedOnTriangleMesh(sceneVegitation, hullShadowRaised)
 
         if (np.sum(maskAbove) > 30):
-            print("TOO MANY ABOVE {} ".format(np.sum(maskAbove)))
-            return False, None, None, None, None,
+            # print("TOO MANY ABOVE {} ".format(np.sum(maskAbove)))
+            details["issue"] = "TOO MANY ABOVE {} ".format(np.sum(maskAbove))
+            return False, None, None, None, None, details
 
     # Remove
 
@@ -69,8 +69,9 @@ def replaceBasedOnShadow(asset, scene, intensity, semantics, instances, details)
 
     # Validate that each side has enough points to be constructed into a mask (4 points min)
     if (len(replaceLeftShadow) < 4 or len(replaceRightShadow) < 4):
-        print("Not enough points left {} or right {} shadow".format(len(replaceLeftShadow), len(replaceRightShadow)))
-        return False, None, None, None, None
+        # print("Not enough points left {} or right {} shadow".format(len(replaceLeftShadow), len(replaceRightShadow)))
+        details["issue"] = "Not enough points left {} or right {} shadow".format(len(replaceLeftShadow), len(replaceRightShadow))
+        return False, None, None, None, None, details
 
     # Get the angles for left and right
     angleLeft = pcdCommon.getAngleRadians(pcdCommon.centerCamPoint, leftPoint, midPoint)
@@ -119,19 +120,22 @@ def replaceBasedOnShadow(asset, scene, intensity, semantics, instances, details)
         invalidSem = ""
         for sem in semSetInval:
             invalidSem += (semanticMapping.name_label_mapping[sem] + " ")
-        print("Invalid semantics to replace with: {}".format(invalidSem))
-        return False, None, None, None, None
+        # print("Invalid semantics to replace with: {}".format(invalidSem))
+        details["issue"] = "Invalid semantics to replace with: {}".format(invalidSem)
+        return False, None, None, None, None, details
 
 
     # Rotate any points included in the shadow halves to fill the hole
     if (len(pcdIncluded) > 0):
         pcdIncluded = pcdCommon.rotatePoints(pcdIncluded, angleLeft)
     else:
-        print("left points empty")
+        # print("left points empty")
+        details["issue"] = "left points empty"
     if (len(pcdIncluded2) > 0):
         pcdIncluded2 = pcdCommon.rotatePoints(pcdIncluded2, 360 - angleRight)
     else:
-        print("right points empty")
+        # print("right points empty")
+        details["issue"] = "right points empty"
 
     # Combine the left and right replacement points
     pcdIncluded, intensityIncluded, semanticsIncluded, instancesIncluded = pcdCommon.combine(pcdIncluded, intensityIncluded, semanticsIncluded, instancesIncluded,
@@ -161,7 +165,7 @@ def replaceBasedOnShadow(asset, scene, intensity, semantics, instances, details)
     sceneReplace, intensityReplace, semanticsReplace, instancesReplace = pcdCommon.combine(pcdIncluded, intensityIncluded, semanticsIncluded, instancesIncluded,
         scene, intensity, semantics, instances)
 
-    return True, sceneReplace, intensityReplace, semanticsReplace, instancesReplace
+    return True, sceneReplace, intensityReplace, semanticsReplace, instancesReplace, details
 
 
 

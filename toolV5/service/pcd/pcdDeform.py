@@ -20,7 +20,7 @@ def deform(asset, details, deformPoint, percentDeform, deformMu, deformSigma, de
     pointIndex = deformPoint
     if (not deformPoint):
         pointIndex = np.random.choice(asset.shape[0], 1, replace=False)
-    print(pointIndex)
+    # print(pointIndex)
 
     # Get the amount of points to deform
     assetNumPoints = np.shape(asset)[0]
@@ -53,11 +53,11 @@ def deform(asset, details, deformPoint, percentDeform, deformMu, deformSigma, de
     noise = np.sort(noise)[::-1]
     # print(np.shape(noise))
     # print(noise)
-    print("total points {}".format(assetNumPoints))
-    print("deformPoints {}".format(k))
-    print("deformPercent {}".format(percentDeform))
-    print("deformMu {}".format(mu))
-    print("deformSigma {}".format(sigma))
+    # print("total points {}".format(assetNumPoints))
+    # print("deformPoints {}".format(k))
+    # print("deformPercent {}".format(percentDeform))
+    # print("deformMu {}".format(mu))
+    # print("deformSigma {}".format(sigma))
     details["deformPercent"] = percentDeform
     details["deformPoint"] = int(pointIndex[0])
     details["deformPoints"] = k
