@@ -316,7 +316,7 @@ Note all bins and labels must be in:
 @param details list of detail dictionarys that enumerates what occured in this transformation
 @return details updated with the results from the models
 """
-def evalBatch(threadNum, details, sessionManager):
+def evalBatch(details, sessionManager):
 
     baseAccRepository = baseAccuracyRepository.BaseAccuracyRepository(sessionManager.mongoConnect)
 
@@ -367,16 +367,20 @@ def evalBatch(threadNum, details, sessionManager):
     # Evaluate 
     print("Eval")
     stageLabel = sessionManager.stageDir + "/labels/"
-    labelFiles = glob.glob(stageLabel + "*.label")
+    labelFiles = []
+    for detail in details:
+        labelFiles.append(stageLabel + detail["_id"] + ".label")
+        # shutil.move(stageVel + detail["_id"] + ".bin", sessionManager.currentVelDir + "/" + detail["_id"] + ".bin")
+    # labelFiles = glob.glob(stageLabel + "*.label")
     predFilesCyl = glob.glob(sessionManager.resultCylDir + "/" + "*.label")
-    predFilesSal = glob.glob(sessionManager.resultSpvDir + "/" + "*.label")
-    predFilesSpv = glob.glob(sessionManager.resultSalDir + "/predictions/" + "*.label")
+    predFilesSal = glob.glob(sessionManager.resultSalDir + "/predictions/" + "*.label")
+    predFilesSpv = glob.glob(sessionManager.resultSpvDir + "/" + "*.label")
     
     # Order the update files cronologically
     labelFiles = sorted(labelFiles)
     predFiles = {}
     predFiles["cyl"] = sorted(predFilesCyl)    
-    predFiles["spv"] = sorted(predFilesSpv)        
+    predFiles["spv"] = sorted(predFilesSpv)
     predFiles["sal"] = sorted(predFilesSal)
     details = sorted(details, key=itemgetter('_id')) 
     for index in range(0, len(labelFiles)):
@@ -405,7 +409,7 @@ def evalBatch(threadNum, details, sessionManager):
         shutil.move(labelFiles[index], sessionManager.doneLabelActualDir + "/" + details[index]["_id"] + ".label")
         shutil.move(predFiles[modelCyl][index], sessionManager.doneLabelDir + "/" + modelCyl + "/" + details[index]["_id"] + ".label")
         shutil.move(predFiles[modelSpv][index], sessionManager.doneLabelDir + "/" + modelSpv + "/" + details[index]["_id"] + ".label")
-        shutil.move(predFiles[modelSal][index], sessionManager.doneLabelDir + "/" + modelSpv + "/" + details[index]["_id"] + ".label")
+        shutil.move(predFiles[modelSal][index], sessionManager.doneLabelDir + "/" + modelSal + "/" + details[index]["_id"] + ".label")
     
 
     # Move to done folder

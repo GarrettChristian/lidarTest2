@@ -12,12 +12,12 @@ saveDir="/home/garrett/Documents/savingRuns/runs6_30"
 echo "Running Tool"
 
 # mut="ADD_ROTATE"
-# mut="ADD_MIRROR_ROTATE"
+mut="ADD_MIRROR_ROTATE"
 # mut="SCENE_REMOVE"
 # mut="SIGN_REPLACE"
 # mut="VEHICLE_DEFORM"
 # mut="VEHICLE_INTENSITY"
-mut="VEHICLE_SCALE"
+# mut="VEHICLE_SCALE"
 
 binPath="/home/garrett/Documents/data/dataset/sequences/"
 lblPath="/home/garrett/Documents/data/dataset4/sequences/"
@@ -26,7 +26,7 @@ batch=400
 
 
 # Run command 
-python semFuzzLidar.py -binPath "$binPath" -labelPath $lblPath -m $mut -count $count -b $batch
+python semFuzzLidar.py -binPath "$binPath" -labelPath $lblPath -m $mut -count $count -b $batch -asyncEval
 
 
 # -------------------------------------------------------------------------------------------------------------------

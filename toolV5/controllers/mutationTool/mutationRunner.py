@@ -182,8 +182,11 @@ def performMutation(mutation, assetRepo, sessionManager, saveVel, saveLabel):
         details["assetSequence"] = assetRecord["sequence"]
         details["assetScene"] = assetRecord["scene"]
         details["assetType"] = assetRecord["type"]
-        details["assetPoints"] = assetRecord["points"]
         details["typeNum"] = assetRecord["typeNum"]
+        details["assetPoints"] = assetRecord["points"]
+        # Points are collected for weight average on add, if sign is taken only the sign point are averaged, not the pole
+        if (assetRecord["typeNum"] == 81):
+            details["assetPoints"] = int(np.shape(pcdArrAsset[semanticsAsset == 81])[0])
     
     # Perform the mutation
 
@@ -290,7 +293,7 @@ def visualize(pcdArrAsset, pcdArr, intensity, semantics, mutationSet):
 
 
 # def batchMutation(threadNum, mutex, sessionManager, mutationDetails, bins, labels, assetRepo):
-def batchMutation(threadNum, sessionManager, mutationDetails, bins, labels, assetRepo, saveVel, saveLabel):
+def batchMutation(threadNum, sessionManager, mutationDetails, assetRepo, saveVel, saveLabel):
     global successNum
     global attemptedNum
     global batchCount
@@ -311,10 +314,10 @@ def batchMutation(threadNum, sessionManager, mutationDetails, bins, labels, asse
 
         # mutex.acquire()
         potentialSuccess -= 1
+        attemptedNum += 1
         if success:
             # print("\n\nThread {}, Attempt {} (successful) [curr successful {}]".format(threadNum, attemptedNum, successNum))
             # print(details)
-            attemptedNum += 1
             batchCount += 1
             successNum += 1
             mutationDetails.append(details)
@@ -328,14 +331,15 @@ def batchMutation(threadNum, sessionManager, mutationDetails, bins, labels, asse
 
 
 
-def evalBatch(sessionManager, mutationDetails, threadNum, finalData, queue):
+def evalBatch(sessionManager, mutationDetails, finalData, queue):
 
+    # PyMongo not process safe
+    # Need to recreate here
     detailsRepo = DetailsRepository(sessionManager.mongoConnect)
-
 
     # Evaluate
     if (sessionManager.evalMutationFlag):
-        details = eval.evalBatch(threadNum, mutationDetails, sessionManager)
+        details = eval.evalBatch(mutationDetails, sessionManager)
         deleteFiles = finalData.updateFinalDetails(details)
         fileIoUtil.removeFiles(deleteFiles)
 
@@ -395,7 +399,7 @@ def runMutations(sessionManager):
         # potentialSuccess = 0
         # mutex = threading.Lock()
         # for n in range(threadCount):
-        #     thread = threading.Thread(target=batchMutation, args=(n, mutex, sessionManager, mutationDetails, bins, labels, assetRepo,))
+        #     thread = threading.Thread(target=batchMutation, args=(n, mutex, sessionManager, labels, assetRepo,))
         #     threadList.append(thread)
         #     thread.start()
 
@@ -406,7 +410,7 @@ def runMutations(sessionManager):
         saveVel = sessionManager.stageDir + "/velodyne/"
         saveLabel = sessionManager.stageDir + "/labels/"
 
-        batchMutation(0, sessionManager, mutationDetails, bins, labels, assetRepo, saveVel, saveLabel)
+        batchMutation(0, sessionManager, mutationDetails, assetRepo, saveVel, saveLabel)
 
         # End timer for mutation batch generation
         toc = time.perf_counter()
@@ -423,14 +427,13 @@ def runMutations(sessionManager):
             ret = queue.get()
             finalData = ret["finalData"]
             queue.put(ret)
-
-            evalNum = threadNum
+            print("Starting evaluation Success: {} / {}".format(successNum, sessionManager.expectedNum))
             # thread = threading.Thread(target=evalBatch, args=(sessionManager, mutationDetails, bins, labels, evalNum, detailsRepo))
-            process = Process(target=evalBatch, args=(sessionManager, mutationDetails, evalNum, finalData, queue))
+            process = Process(target=evalBatch, args=(sessionManager, mutationDetails, finalData, queue))
             processList = [process]
             process.start()
         else:
-            evalBatch(sessionManager, mutationDetails, 0, finalData, queue)
+            evalBatch(sessionManager, mutationDetails, finalData, queue)
 
         # evalBatch(sessionManager, mutationDetails)
 

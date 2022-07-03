@@ -43,7 +43,7 @@ def intensityChange(intensityAsset, type, details, intensityMod):
     
     mod = random.uniform(.1, .3)
     if average > .1:
-        mod = random.uniform(-.1, -.3)
+        mod = mod * -1
 
     # For given recreation
     if (intensityMod != None):

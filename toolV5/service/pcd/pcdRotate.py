@@ -129,6 +129,7 @@ def rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, details, ro
                     details["issue"] = "Asset Obscured"
                 else:
                     # print("Asset Unobscured")
+                    details["issue"] = ""
                     pcdArrAsset = pcdArrAssetNew
                     # print("Removing shadow")
                     pcdArr, intensity, semantics, labelInstance = removeLidarShadow(pcdArrAssetNew, pcdArr, intensity, semantics, labelInstance)
@@ -398,10 +399,10 @@ def alignZdim(asset, scene, semantics):
     groundAvg = 0
     if (np.shape(onlyByCar)[0] != 0):
         groundAvg = np.average(onlyByCar.T[2])
-        print("ground")
+        # print("ground")
     else:
         groundAvg = np.average(pcdArrGround.T[2])
-        print("avg")
+        # print("avg")
 
     # Use the boundin box min to get the change to add to the Z dim to align the asset to the 
     assetMin = np.min(asset[:, 2])
