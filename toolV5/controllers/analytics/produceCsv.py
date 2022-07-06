@@ -150,23 +150,6 @@ def createMutationCsv(mutationDataAcc, mutation, accType, saveAt, bucketKeys):
     for row in rows:
         csvWriter.writerow(row)
 
-       
-"""
-Connect to mongodb 
-"""
-def mongoConnect():
-    global mutationCollection
-
-    configFile = open("../../mongoconnect.txt", "r")
-    mongoUrl = configFile.readline()
-    print("Connecting to mongodb")
-    configFile.close()
-    
-    client = MongoClient(mongoUrl)
-    db = client["lidar_data"]
-    
-    return db["final_data"]
-
 
 
 def parse_args():

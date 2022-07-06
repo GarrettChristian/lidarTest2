@@ -165,6 +165,10 @@ def replaceBasedOnShadow(asset, scene, intensity, semantics, instances, details)
     sceneReplace, intensityReplace, semanticsReplace, instancesReplace = pcdCommon.combine(pcdIncluded, intensityIncluded, semanticsIncluded, instancesIncluded,
         scene, intensity, semantics, instances)
 
+    details["pointsRemoved"] = int(np.shape(asset)[0])
+    details["pointsAdded"] = len(pcdIncluded) + len(pcdIncluded2)
+    details["pointsAffected"] = int(np.shape(asset)[0]) + len(pcdIncluded) + len(pcdIncluded2)
+
     return True, sceneReplace, intensityReplace, semanticsReplace, instancesReplace, details
 
 

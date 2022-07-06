@@ -64,6 +64,7 @@ def deform(asset, details, deformPoint, percentDeform, deformMu, deformSigma, de
     details["deformMu"] = mu
     details["deformSigma"] = sigma
     details["deformSeed"] = deformSeed
+    details["pointsAffected"] = k
 
     for index in range(0, len(idx)):
         asset[idx[index]] = translatePointFromCenter(asset[idx[index]], noise[index])

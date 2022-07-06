@@ -105,6 +105,7 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, instancesAsset,
     newIntensityAsset = intensityAsset[hit.numpy()] 
     newSemanticsAsset = semanticsAsset[hit.numpy()]
     newInstancesAsset = instancesAsset[hit.numpy()]
+    nonHitAsset = np.logical_not(hit.numpy())
 
     # print(len(newAsset))
     # print(len(newAssetScene))
@@ -132,6 +133,8 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, instancesAsset,
         details["issue"] = "New asset too little points {}".format(np.shape(newAsset)[0])
         return False, None, None, None, None, None, None, None, None, details
 
+    details["pointsRemoved"] = int(np.sum(nonHitAsset))
+    details["pointsAffected"] = int(np.shape(newAsset)[0])
 
     # Return revised scene with scaled vehicle 
     return True, newAsset, intensityAsset, semanticsAsset, instancesAsset, sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, instancesNonIntersect, details

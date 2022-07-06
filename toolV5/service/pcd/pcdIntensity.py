@@ -9,7 +9,7 @@ import domain.semanticMapping as semanticMapping
 # --------------------------------------------------------------------------
 # Intensity
 
-def intensityChange(intensityAsset, type, details, intensityMod):
+def intensityChange(intensityAsset, details, intensityMod):
 
     # Create a mask that represents the portion to change the intensity for
     mask = np.ones(np.shape(intensityAsset), dtype=bool)
@@ -50,7 +50,7 @@ def intensityChange(intensityAsset, type, details, intensityMod):
         mod = intensityMod
 
     details["intensity"] = mod
-    details["intensityPoints"] = int(np.shape(intensityAsset[mask])[0])
+    details["pointsAffected"] = int(np.shape(intensityAsset[mask])[0])
     
     # print("Intensity {}".format(mod))
     

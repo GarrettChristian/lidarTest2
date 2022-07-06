@@ -156,6 +156,10 @@ def signReplace(signAsset, intensityAsset, semanticsAsset, instancesAsset,
         details["issue"] = "Sign too little points {}".format(np.shape(sign)[0])
         success = False
 
+    details["pointsRemoved"] = pointsRemoved
+    details["pointsAdded"] = int(np.shape(pcdArrAssetNew)[0])
+    details["pointsAffected"] = int(np.shape(pcdArrAssetNew)[0]) + pointsRemoved
+
     return success, sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, instancesNonIntersect, sign, intensitySign, semanticsSign, instancesSign, details
 
 
@@ -304,13 +308,14 @@ def pointsToMesh(mesh, assetData, sceneData, details):
     intensityAsset = intensityAsset[hit.numpy()] 
     semanticsAsset = semanticsAsset[hit.numpy()]
     instancesAsset = instancesAsset[hit.numpy()]
+    nonHitAsset = np.logical_not(hit.numpy())
 
     # print(len(newAsset))
     # print(len(newAssetScene))
 
     if len(newAsset) == 0 or len(newAssetScene) == 0:
         # print("GOT NONE OF THE OG ASSET {} OR NONE OF SCENE {}".format(len(newAsset), len(newAssetScene)))
-        details["issue"] = "GOT NONE OF THE OG ASSET {} OR NONE OF SCENE {}".format(len(newAsset), len(newAssetScene))
+        details["issue"] = "GOT NONE OF THE ORIGINAL ASSET {} OR NONE OF SCENE {}".format(len(newAsset), len(newAssetScene))
         return False, (None, None, None, None), (None, None, None, None), details
 
     # Fix the intensity of each of the points in the scene that were pulled into the sign by using the closest sign point
@@ -327,9 +332,15 @@ def pointsToMesh(mesh, assetData, sceneData, details):
     newAsset, intensityAsset, semanticsAsset, instancesAsset = pcdCommon.combine(newAsset, intensityAsset, semanticsAsset, instancesAsset, 
                                                                     newAssetScene, intensityIntersect, semanticsIntersect, instancesIntersect)
 
+    details["pointsRemoved"] = int(np.sum(nonHitAsset))
+    details["pointsMoved"] = int(np.shape(newAsset)[0])
+    details["pointsAffected"] = int(np.shape(newAsset)[0]) + int(np.sum(nonHitAsset))
+
     # Return revised scene
     newAssetData = (newAsset, intensityAsset, semanticsAsset, instancesAsset)
     newSceneData = (sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, instancesNonIntersect)
     return True, newAssetData, newSceneData, details
+
+
 
 

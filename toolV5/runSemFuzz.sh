@@ -30,12 +30,14 @@ assetId="00-004159-431-car"
 assetId="01-000050-1389-traffic-sign"
 assetId="01-000050-1389-traffic-sign"
 assetId="02-000065-1837-traffic-sign"
+assetId="00-000014-1-moving-motorcyclist"
+assetId="08-003459-1023-traffic-sign"
 # assetId="00-000000-1"
 # assetId="00-000156-6"
 # assetId="04-000050-6-moving-car"
 # assetId="08-000368-12-other-vehicle"
 # assetId="06-000882-3-truck"
-count=1
+count=100
 batch=50
 
 
@@ -44,7 +46,8 @@ batch=50
 # Run command 
 
 # python semFuzzLidar.py -path "$velPath" -lbls $lblPath
-python semFuzzLidar.py -binPath "$binPath" -labelPath $lblPath -m $mut -count $count -b $batch -assetId $assetId
+python semFuzzLidar.py -binPath "$binPath" -labelPath $lblPath -m $mut -count $count -b $batch -asyncEval
+# python semFuzzLidar.py -binPath "$binPath" -labelPath $lblPath -m $mut -count $count -b $batch -assetId $assetId -vis
 # python semFuzzLidar.py -binPath "$binPath" -labelPath $lblPath -m $mut -count $count -b $batch
 # python semFuzzLidar.py -binPath "$binPath" -labelPath $lblPath -m $mut -count $count -b $batch -asyncEval
 # python semFuzzLidar.py -binPath "$binPath" -labelPath $lblPath -m $mut -count $count -b $batch -assetId $assetId -ns -vis

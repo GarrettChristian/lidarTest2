@@ -247,8 +247,10 @@ def evalLabels(label_file, pred_file, baseAccuracy, baseAccuracyAsset, typeNum, 
                 totalClasses += 1
                 classNumInv = learning_map_inv[classNum]
                 className = name_label_mapping[classNumInv]
+                print(className)
                 baseClassJacc = baseAccuracy[className]
                 if (classNum in classesInLabel):
+                    print(className)
                     jaccardRemove += baseClassJacc
                 # Add 0 if not found in new label class, this could happen if you remove the only person 
         
@@ -373,8 +375,8 @@ def evalBatch(details, sessionManager):
         # shutil.move(stageVel + detail["_id"] + ".bin", sessionManager.currentVelDir + "/" + detail["_id"] + ".bin")
     # labelFiles = glob.glob(stageLabel + "*.label")
     predFilesCyl = glob.glob(sessionManager.resultCylDir + "/" + "*.label")
-    predFilesSal = glob.glob(sessionManager.resultSalDir + "/predictions/" + "*.label")
     predFilesSpv = glob.glob(sessionManager.resultSpvDir + "/" + "*.label")
+    predFilesSal = glob.glob(sessionManager.resultSalDir + "/predictions/" + "*.label")
     
     # Order the update files cronologically
     labelFiles = sorted(labelFiles)

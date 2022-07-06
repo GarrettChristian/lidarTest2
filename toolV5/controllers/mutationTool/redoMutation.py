@@ -123,7 +123,7 @@ def recreateOne(details, assetRepo, sessionManager):
     # Mirror
     sessionManager.mirrorAxis = details.get("mirror", None)
     # Scale
-    sessionManager.scaleAmount = details.get("rotate", None)
+    sessionManager.scaleAmount = details.get("scale", None)
     # Sign Change
     sessionManager.signChange = details.get("sign", None)
     # Deform
@@ -132,6 +132,8 @@ def recreateOne(details, assetRepo, sessionManager):
     sessionManager.deformMu = details.get("deformMu", None)
     sessionManager.deformSigma = details.get("deformSigma", None)
     sessionManager.deformSeed = details.get("deformSeed", None)
+    # Intensity
+    sessionManager.intensity = details.get("intensity", None)
 
 
     return mutationRunner.performMutation(details["mutation"], assetRepo, sessionManager)

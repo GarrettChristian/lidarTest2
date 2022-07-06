@@ -132,7 +132,11 @@ def rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, details, ro
                     details["issue"] = ""
                     pcdArrAsset = pcdArrAssetNew
                     # print("Removing shadow")
-                    pcdArr, intensity, semantics, labelInstance = removeLidarShadow(pcdArrAssetNew, pcdArr, intensity, semantics, labelInstance)
+                    pcdArr, intensity, semantics, labelInstance, pointsRemoved = removeLidarShadow(pcdArrAssetNew, pcdArr, intensity, semantics, labelInstance)
+                    details["pointsRemoved"] = pointsRemoved
+                    details["pointsAdded"] = int(np.shape(pcdArrAssetNew)[0])
+                    details["pointsAffected"] = int(np.shape(pcdArrAssetNew)[0]) + pointsRemoved
+
 
         attempts += 1
     
@@ -150,6 +154,7 @@ def removeLidarShadow(asset, scene, intensity, semantics, instances):
     lidarShadowMesh = pcdCommon.getLidarShadowMesh(asset)
 
     mask = pcdCommon.checkInclusionBasedOnTriangleMesh(scene, lidarShadowMesh)
+    pointsIncluded = int(np.sum(mask))
     mask = np.logical_not(mask)
 
     sceneResult = scene[mask, :]
@@ -157,7 +162,7 @@ def removeLidarShadow(asset, scene, intensity, semantics, instances):
     semanticsResult = semantics[mask]
     instancesResult = instances[mask]
 
-    return (sceneResult, intensityResult, semanticsResult, instancesResult)
+    return (sceneResult, intensityResult, semanticsResult, instancesResult, pointsIncluded)
 
 # --------------------------------------------------------------------------
 # Pre Check for valid placement

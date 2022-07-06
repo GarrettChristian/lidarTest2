@@ -82,7 +82,7 @@ def performMutation(mutation, assetRepo, sessionManager, saveVel, saveLabel):
     details = {}
     details["_id"] = mutationId + "-" + mutation
     details["mutationId"] = mutationId
-    details["time"] = int(time.time())
+    details["epochTime"] = int(time.time())
     details["dateTime"] = time.ctime(time.time())
     details["batchId"] = sessionManager.batchId
     details["mutation"] = mutation
@@ -249,7 +249,7 @@ def performMutation(mutation, assetRepo, sessionManager, saveVel, saveLabel):
     # Combine the xyz, intensity and semantics, instance labels labels and bins
     if (success):
         details["seconds"] = timeSeconds
-        details["time"] = timeFormatted
+        details["mutationTime"] = timeFormatted
         if (sessionManager.saveMutationFlag):
             xyziFinal, labelFinal = fileIoUtil.prepareToSave(pcdArr, intensity, semantics, instances)
             fileIoUtil.saveBinLabelPair(xyziFinal, labelFinal, saveVel, saveLabel, details["_id"])
@@ -265,6 +265,15 @@ Colors based on semantics
 Or by intensity if inensity was altered
 """
 def visualize(pcdArrAsset, pcdArr, intensity, semantics, mutationSet):
+
+
+
+
+    print("here????")
+    print(np.shape(semantics[(semantics == 81)]))
+    print(semantics[(semantics == 81)])
+
+
     # Get asset box
     pcdAsset = o3d.geometry.PointCloud()
     pcdAsset.points = o3d.utility.Vector3dVector(pcdArrAsset)
@@ -316,8 +325,8 @@ def batchMutation(threadNum, sessionManager, mutationDetails, assetRepo, saveVel
         potentialSuccess -= 1
         attemptedNum += 1
         if success:
-            # print("\n\nThread {}, Attempt {} (successful) [curr successful {}]".format(threadNum, attemptedNum, successNum))
-            # print(details)
+            print("\n\nThread {}, Attempt {} (successful) [curr successful {}]".format(threadNum, attemptedNum, successNum))
+            print(details)
             batchCount += 1
             successNum += 1
             mutationDetails.append(details)
