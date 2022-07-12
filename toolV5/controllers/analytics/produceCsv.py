@@ -4,7 +4,6 @@ import argparse
 import json
 import os
 import sys
-from pymongo import MongoClient
 
 import data.finalDataRepository as finalDataRepository
 import domain.mutationsEnum as mutationsEnum
@@ -23,6 +22,22 @@ def creatBucketCol(bucketData, bucketKey):
     col.append(bucketData["total"])
     for model in models:
         col.append(bucketData["total_" + model])
+
+    col.append("")
+    col.append("")
+    for modelCombo in modelCombos:
+        if (modelCombo in bucketData["model_overlap"].keys()):
+            col.append(bucketData["model_overlap"][modelCombo])
+        else:
+            col.append(0)
+
+    col.append("")
+    col.append("")
+    for modelCombo in modelCombos:
+        if (modelCombo in bucketData["model_threshold_overlap"].keys()):
+            col.append(bucketData["model_threshold_overlap"][modelCombo])
+        else:
+            col.append(0)
         
     col.append("")
 
@@ -52,21 +67,63 @@ def creatBucketCol(bucketData, bucketKey):
             col.append(bucketData["max_" + model])
     
     col.append("")
-    for modelCombo in modelCombos:
-        if (modelCombo in bucketData["model_overlap"].keys()):
-            col.append(bucketData["model_overlap"][modelCombo])
-        else:
-            col.append(0)
+
+    if (bucketData["min_points_affected"] == sys.maxsize):
+        col.append("-")
+    else:
+        col.append(bucketData["min_points_affected"])
+    if (bucketData["max_points_affected"] == sys.maxsize * -1):
+        col.append("-")
+    else:
+        col.append(bucketData["max_points_affected"])
+    col.append(bucketData["avg_points_affected"])
+
+    col.append("")
+
+    if (bucketData["min_seconds"] == sys.maxsize):
+        col.append("-")
+    else:
+        col.append(bucketData["min_seconds"])
+    if (bucketData["max_seconds"] == sys.maxsize * -1):
+        col.append("-")
+    else:
+        col.append(bucketData["max_seconds"])
+    col.append(bucketData["avg_seconds"])
+
+    col.append("")
+
+    col.append("")
+    col.append("")
+
+    col.append("")
+    col.append("")
+
+    col.append("")
+    col.append("")
+
+
 
     return col
 
-def creatAllCol(allData):
+def creatAllCol(allData, duplicates, duplicatePercent, time):
     
     col = ["All"]
     col.append(allData["total"] * len(models))
     for _ in models:
         col.append(allData["total"])
-        
+    
+    # overlap
+    col.append("")
+    col.append("")
+    for _ in modelCombos:
+        col.append("")
+
+    # overlap threshold
+    col.append("")
+    col.append("")
+    for _ in modelCombos:
+        col.append("")
+            
     col.append("")
 
     col.append(allData["avg"])
@@ -80,14 +137,35 @@ def creatAllCol(allData):
     col.append(allData["max"])
     for model in models:
         col.append(allData["max_" + model])
-    
+
     col.append("")
-    for _ in modelCombos:
-        col.append("")
+
+    col.append(allData["min_points_affected"])
+    col.append(allData["max_points_affected"])
+    col.append(allData["avg_points_affected"])
+
+    col.append("")
+
+    col.append(allData["min_seconds"])
+    col.append(allData["max_seconds"])
+    col.append(allData["avg_seconds"])
+
+    col.append("")
+
+    col.append(duplicates)
+    col.append(duplicatePercent)
+
+    col.append("")
+
+    col.append(time)
+
+    col.append("")
+
+
 
     return col
 
-def createMutationCsv(mutationDataAcc, mutation, accType, saveAt, bucketKeys):
+def createMutationCsv(mutationDataAcc, mutation, accType, saveAt, bucketKeys, time):
 
     print("Creating csv for {} {}".format(mutation, accType))
 
@@ -98,6 +176,16 @@ def createMutationCsv(mutationDataAcc, mutation, accType, saveAt, bucketKeys):
     titleCol = [mutation, "Total"]
     for model in models:
         titleCol.append(model + " Total")
+
+    titleCol.append("")
+    titleCol.append("Bucket Overlap")
+    for modelCombo in modelCombos:
+        titleCol.append(modelCombo)
+
+    titleCol.append("")
+    titleCol.append("Failure Thresholds")
+    for modelCombo in modelCombos:
+        titleCol.append(modelCombo)
         
     titleCol.append("")
 
@@ -112,14 +200,35 @@ def createMutationCsv(mutationDataAcc, mutation, accType, saveAt, bucketKeys):
     titleCol.append("Max " + accType + " % Loss")
     for model in models:
         titleCol.append("Max " + accType + " % Loss {}".format(model))
-    
+
     titleCol.append("")
-    for modelCombo in modelCombos:
-        titleCol.append(modelCombo)
+
+    titleCol.append("Min Points Affected")
+    titleCol.append("Max Points Affected")
+    titleCol.append("Avg Points Affected")
+
+    titleCol.append("")
+
+    titleCol.append("Min Seconds")
+    titleCol.append("Max Seconds")
+    titleCol.append("Avg Seconds")
+
+    titleCol.append("")
+
+    titleCol.append("Duplicates")
+    titleCol.append("Duplicates Percent")
+
+    titleCol.append("")
+
+    titleCol.append("Time")
+
+    titleCol.append("")
+    
+
     
     cols.append(titleCol)
 
-    allCol = creatAllCol(mutationData["all"])
+    allCol = creatAllCol(mutationData["all"], mutationDataAcc["duplicates"], mutationDataAcc["duplicatesPercent"], time)
     cols.append(allCol)
 
 
@@ -134,8 +243,9 @@ def createMutationCsv(mutationDataAcc, mutation, accType, saveAt, bucketKeys):
             "bucket_1: -0.1% > x >= -1%", 
             "bucket_2:   -1% > x >= -2%", 
             "bucket_3:   -2% > x >= -3%",
-            "bucket_4:   -3% > x >= -5%",
-            "bucket_5:   -5% > x"]
+            "bucket_4:   -3% > x >= -4%",
+            "bucket_5:   -4% > x >= -5%",
+            "bucket_6:   -5% > x"]
     while (len(keyCol) < len(allCol)):
         keyCol.append("")
     cols.append(keyCol)
@@ -208,8 +318,8 @@ def main():
 
     # Create a csv with the data from the final data json run 
     for mutationKey in mutations:
-        createMutationCsv(data[mutationKey], mutationKey, "accuracy", args.saveAt, bucketKeys)
-        createMutationCsv(data[mutationKey], mutationKey, "jaccard", args.saveAt, bucketKeys)
+        createMutationCsv(data[mutationKey], mutationKey, "accuracy", args.saveAt, bucketKeys, data["time"])
+        createMutationCsv(data[mutationKey], mutationKey, "jaccard", args.saveAt, bucketKeys, data["time"])
     
     
 

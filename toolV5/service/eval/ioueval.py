@@ -59,32 +59,32 @@ class iouEval:
     fn = conf.sum(axis=0) - tp
     return tp, fp, fn
 
-  def getIoU(self):
-    tp, fp, fn = self.getStats()
-
-    sumJac = 0
-    classesNonZero = 0
-    for className in self.include:
-      unionClass = tp[className] + fp[className] + fn[className]
-      if unionClass != 0:
-        sumJac += tp[className] / unionClass
-        classesNonZero += 1
-
-    iou_mean_modified = sumJac / classesNonZero
-
-    intersection = tp
-    union = tp + fp + fn + 1e-15
-    iou = intersection / union
-    iou_mean = (intersection[self.include] / union[self.include]).mean()
-    return iou_mean, iou_mean_modified, iou  # returns "iou mean", "iou per class" ALL CLASSES
-
   # def getIoU(self):
   #   tp, fp, fn = self.getStats()
+
+  #   sumJac = 0
+  #   classesNonZero = 0
+  #   for className in self.include:
+  #     unionClass = tp[className] + fp[className] + fn[className]
+  #     if unionClass != 0:
+  #       sumJac += tp[className] / unionClass
+  #       classesNonZero += 1
+
+  #   iou_mean_modified = sumJac / classesNonZero
+
   #   intersection = tp
   #   union = tp + fp + fn + 1e-15
   #   iou = intersection / union
   #   iou_mean = (intersection[self.include] / union[self.include]).mean()
-  #   return iou_mean, iou  # returns "iou mean", "iou per class" ALL CLASSES
+  #   return iou_mean, iou_mean_modified, iou  # returns "iou mean", "iou per class" ALL CLASSES
+
+  def getIoU(self):
+    tp, fp, fn = self.getStats()
+    intersection = tp
+    union = tp + fp + fn + 1e-15
+    iou = intersection / union
+    iou_mean = (intersection[self.include] / union[self.include]).mean()
+    return iou_mean, iou  # returns "iou mean", "iou per class" ALL CLASSES
 
   def getacc(self):
     tp, fp, fn = self.getStats()

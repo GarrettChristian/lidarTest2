@@ -73,7 +73,7 @@ def batchRecreation(batchId, sessionManager, saveVel, saveLabel):
 
         # Catch in case there was an error
         if (count == 0):
-            total = total
+            total = parsed
 
         # Save bin and labels
         for index in range(0, len(mutationDetails)):

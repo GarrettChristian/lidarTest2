@@ -6,6 +6,7 @@ import open3d as o3d
 import service.pcd.pcdCommon as pcdCommon
 
 import domain.semanticMapping as semanticMapping
+from domain.modelConstants import models
 
 
 # --------------------------------------------------------------------------
@@ -16,7 +17,7 @@ import domain.semanticMapping as semanticMapping
 Removes the LiDAR shadow by casting lines based on the hull of the asset
 Then deleteing if the points are found within the polygon
 """
-def replaceBasedOnShadow(asset, scene, intensity, semantics, instances, details):
+def replaceBasedOnShadow(asset, scene, intensity, semantics, instances, details, modelPredictions):
 
     # Get the objects shadow
     shadow = pcdCommon.getLidarShadowMesh(asset)
@@ -38,7 +39,7 @@ def replaceBasedOnShadow(asset, scene, intensity, semantics, instances, details)
         if (np.sum(maskAbove) > 30):
             # print("TOO MANY ABOVE {} ".format(np.sum(maskAbove)))
             details["issue"] = "TOO MANY ABOVE {} ".format(np.sum(maskAbove))
-            return False, None, None, None, None, details
+            return False, None, None, None, None, details, None
 
     # Remove
 
@@ -71,7 +72,7 @@ def replaceBasedOnShadow(asset, scene, intensity, semantics, instances, details)
     if (len(replaceLeftShadow) < 4 or len(replaceRightShadow) < 4):
         # print("Not enough points left {} or right {} shadow".format(len(replaceLeftShadow), len(replaceRightShadow)))
         details["issue"] = "Not enough points left {} or right {} shadow".format(len(replaceLeftShadow), len(replaceRightShadow))
-        return False, None, None, None, None, details
+        return False, None, None, None, None, details, None
 
     # Get the angles for left and right
     angleLeft = pcdCommon.getAngleRadians(pcdCommon.centerCamPoint, leftPoint, midPoint)
@@ -122,7 +123,7 @@ def replaceBasedOnShadow(asset, scene, intensity, semantics, instances, details)
             invalidSem += (semanticMapping.name_label_mapping[sem] + " ")
         # print("Invalid semantics to replace with: {}".format(invalidSem))
         details["issue"] = "Invalid semantics to replace with: {}".format(invalidSem)
-        return False, None, None, None, None, details
+        return False, None, None, None, None, details, None
 
 
     # Rotate any points included in the shadow halves to fill the hole
@@ -139,7 +140,7 @@ def replaceBasedOnShadow(asset, scene, intensity, semantics, instances, details)
 
     # Combine the left and right replacement points
     pcdIncluded, intensityIncluded, semanticsIncluded, instancesIncluded = pcdCommon.combine(pcdIncluded, intensityIncluded, semanticsIncluded, instancesIncluded,
-                                                                                pcdIncluded2, intensityIncluded2, semanticsIncluded2, instancesIncluded2)
+                                                                                        pcdIncluded2, intensityIncluded2, semanticsIncluded2, instancesIncluded2)
 
     # TODO REMOVE Visualization
     # hull_ls = o3d.geometry.LineSet.create_from_triangle_mesh(shadow)
@@ -161,15 +162,24 @@ def replaceBasedOnShadow(asset, scene, intensity, semantics, instances, details)
     # o3d.visualization.draw_geometries([hull_ls, hull_ls2, hull_ls22, pcdNewAddition, pcdScene, pcdCast2])
 
 
-    # Combine the new points with the scene to fill the asset's hole 
+    # Combine the new points with the scene to fill the asset's hole
     sceneReplace, intensityReplace, semanticsReplace, instancesReplace = pcdCommon.combine(pcdIncluded, intensityIncluded, semanticsIncluded, instancesIncluded,
-        scene, intensity, semantics, instances)
+                                                                                            scene, intensity, semantics, instances)
 
+    # Update model prediction files
+    for model in models:
+        modelSem1 = modelPredictions[model][maskIncluded]
+        modelSem2 = modelPredictions[model][maskIncluded2]
+        semanticsCombinedHole = np.hstack((modelSem1, modelSem2))
+        semanticsCombined = np.hstack((semanticsCombinedHole, modelPredictions[model]))
+        modelPredictions[model] = semanticsCombined
+        
+    # Note how many points were utilized in this mutation
     details["pointsRemoved"] = int(np.shape(asset)[0])
     details["pointsAdded"] = len(pcdIncluded) + len(pcdIncluded2)
     details["pointsAffected"] = int(np.shape(asset)[0]) + len(pcdIncluded) + len(pcdIncluded2)
 
-    return True, sceneReplace, intensityReplace, semanticsReplace, instancesReplace, details
+    return True, sceneReplace, intensityReplace, semanticsReplace, instancesReplace, details, modelPredictions
 
 
 

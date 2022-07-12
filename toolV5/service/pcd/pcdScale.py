@@ -5,6 +5,7 @@ import open3d as o3d
 import random
 
 import service.pcd.pcdCommon as pcdCommon
+from domain.modelConstants import models
 
 
 # --------------------------------------------------------------------------
@@ -12,7 +13,8 @@ import service.pcd.pcdCommon as pcdCommon
 
 def scaleVehicle(asset, intensityAsset, semanticsAsset, instancesAsset, 
                 scene, intensity, semantics, instances, details, 
-                scaleLimit, scaleAmount):
+                scaleLimit, scaleAmount,
+                modelPredictionsScene, modelPredictionsAsset):
 
 
     # Prepare to create the mesh estimating normals
@@ -26,7 +28,7 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, instancesAsset,
     if (np.shape(asset)[0] > scaleLimit):
         # print("Point count {} exceeds scale point limit {}".format(np.shape(asset)[0], scaleLimit))
         details["issue"] = "Point count {} exceeds scale point limit {}".format(np.shape(asset)[0], scaleLimit)
-        return False, None, None, None, None, None, None, None, None, details
+        return False, (None, None, None, None), (None, None, None, None), details, None, None
     
     # Create a mesh using the ball pivoting method
     radii = [0.15]
@@ -38,7 +40,7 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, instancesAsset,
     if (np.shape(np.array(mesh.vertices))[0] < 1 or np.shape(np.array(mesh.triangles))[0] < 1):
         # print("MESH NOT SUFFICENT: Vertices {} Triangles {}".format(np.shape(np.array(mesh.vertices))[0], np.shape(np.array(mesh.triangles))[0]))
         details["issue"] = "MESH NOT SUFFICENT: Vertices {} Triangles {}".format(np.shape(np.array(mesh.vertices))[0], np.shape(np.array(mesh.triangles))[0])
-        return False, None, None, None, None, None, None, None, None, details
+        return False, (None, None, None, None), (None, None, None, None), details, None, None
     
     # Smooth the mesh
     mesh = mesh.filter_smooth_simple(number_of_iterations=1)
@@ -47,7 +49,8 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, instancesAsset,
     # Scale the vehicle mesh
     scale = scaleAmount
     if (not scale):
-        scale = random.uniform(1.01, 1.05)
+        # scale = random.uniform(1.01, 1.05)
+        scale = 1.05
     details["scale"] = scale
     mesh.scale(scale, center=mesh.get_center())
 
@@ -63,7 +66,7 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, instancesAsset,
     if (np.shape(scene)[0] < 1 or np.shape(asset)[0] < 1):
         # print("SCENE or ASSET PROVIDED EMPTY: SCENE {}, ASSET {}".format(np.shape(scene)[0], np.shape(asset)[0]))
         details["issue"] = "SCENE or ASSET PROVIDED EMPTY: SCENE {}, ASSET {}".format(np.shape(scene)[0], np.shape(asset)[0])
-        return False, None, None, None, None, None, None, None, None, details
+        return False, (None, None, None, None), (None, None, None, None), details, None, None
 
     raysVectorsScene = []
     for point in scene:
@@ -95,17 +98,17 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, instancesAsset,
 
     rays = o3d.core.Tensor(raysVectorsMesh, dtype=o3d.core.Dtype.Float32)
     ans = sceneRays.cast_rays(rays)
-    hit = ans['t_hit'].isfinite()
-    pointsOnMesh = rays[hit][:,:3] + rays[hit][:,3:]*ans['t_hit'][hit].reshape((-1,1))
+    hitAsset = ans['t_hit'].isfinite()
+    pointsOnMesh = rays[hitAsset][:,:3] + rays[hitAsset][:,3:]*ans['t_hit'][hitAsset].reshape((-1,1))
 
     newAsset = []
     for vector in pointsOnMesh:
         newAsset.append(vector.numpy())
     
-    newIntensityAsset = intensityAsset[hit.numpy()] 
-    newSemanticsAsset = semanticsAsset[hit.numpy()]
-    newInstancesAsset = instancesAsset[hit.numpy()]
-    nonHitAsset = np.logical_not(hit.numpy())
+    newIntensityAsset = intensityAsset[hitAsset.numpy()] 
+    newSemanticsAsset = semanticsAsset[hitAsset.numpy()]
+    newInstancesAsset = instancesAsset[hitAsset.numpy()]
+    nonHitAsset = np.logical_not(hitAsset.numpy())
 
     # print(len(newAsset))
     # print(len(newAssetScene))
@@ -113,7 +116,14 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, instancesAsset,
     if len(newAsset) == 0 or len(newAssetScene) == 0:
         # print("GOT NONE OF THE OG ASSET {} OR NONE OF SCENE {}".format(len(newAsset), len(newAssetScene)))
         details["issue"] = "GOT NONE OF THE OG ASSET {} OR NONE OF SCENE {}".format(len(newAsset), len(newAssetScene))
-        return False, None, None, None, None, None, None, None, None, details
+        return False, (None, None, None, None), (None, None, None, None), details, None, None
+
+    
+    # Update the model prediction semantics as we go
+    modelsSemIntersect = {}
+    for model in models:
+        modelsSemIntersect[model] = modelPredictionsScene[model][hit.numpy()]
+
 
     # Fix the intensity of each of the points in the scene that were pulled into the asset by using the closest scaled asset point
     pcd_tree = o3d.geometry.KDTreeFlann(scaledPoints)
@@ -123,6 +133,10 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, instancesAsset,
         semanticsIntersect[pointIndex] = semanticsAsset[idx]
         instancesIntersect[pointIndex] = instancesAsset[idx]
 
+        # Update model pred
+        for model in models:
+            modelsSemIntersect[model][pointIndex] = modelPredictionsAsset[model][idx]
+
     newAsset, intensityAsset, semanticsAsset, instancesAsset = pcdCommon.combine(newAsset, newIntensityAsset, newSemanticsAsset, newInstancesAsset, 
                                                                     newAssetScene, intensityIntersect, semanticsIntersect, instancesIntersect)
 
@@ -131,13 +145,27 @@ def scaleVehicle(asset, intensityAsset, semanticsAsset, instancesAsset,
     if (np.shape(newAsset)[0] < 20):
         # print("New asset too little points {}".format(np.shape(newAsset)[0]))
         details["issue"] = "New asset too little points {}".format(np.shape(newAsset)[0])
-        return False, None, None, None, None, None, None, None, None, details
+        return False, (None, None, None, None), (None, None, None, None), details, None, None
 
+
+    # Update model pred semantics
+    for model in models:
+        # Update Asset
+        newSemanticsAssetModel = modelPredictionsAsset[model][hitAsset.numpy()]
+        modelPredictionsAsset[model] = np.hstack((newSemanticsAssetModel, modelsSemIntersect[model]))
+        # Update Scene
+        modelPredictionsScene[model] = modelPredictionsScene[model][nonHit]
+
+
+    # Update the points affected
     details["pointsRemoved"] = int(np.sum(nonHitAsset))
     details["pointsAffected"] = int(np.shape(newAsset)[0])
 
+    resultAsset = (newAsset, intensityAsset, semanticsAsset, instancesAsset)
+    resultScene = (sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, instancesNonIntersect)
+
     # Return revised scene with scaled vehicle 
-    return True, newAsset, intensityAsset, semanticsAsset, instancesAsset, sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, instancesNonIntersect, details
+    return True, resultAsset, resultScene, details, modelPredictionsScene, modelPredictionsAsset
 
 
 

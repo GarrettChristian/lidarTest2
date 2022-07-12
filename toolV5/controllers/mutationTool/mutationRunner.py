@@ -17,8 +17,9 @@ import time
 import json
 
 # import threading
-from multiprocessing import Process
-from multiprocessing import Queue
+# from multiprocessing import Process
+# from multiprocessing import Queue
+import multiprocessing as mp
 
 from data.assetRepository import AssetRepository
 from data.mutationDetailsRepository import DetailsRepository
@@ -28,6 +29,7 @@ import data.fileIoUtil as fileIoUtil
 
 import domain.semanticMapping as semanticMapping
 import domain.mutationsEnum as mutationsEnum
+from domain.modelConstants import models
 
 import service.pcd.pcdCommon as pcdCommon
 import service.pcd.pcdDeform as pcdDeform
@@ -71,7 +73,7 @@ def formatSecondsToHhmmss(seconds):
 # ----------------------------------------------------------
 
 
-def performMutation(mutation, assetRepo, sessionManager, saveVel, saveLabel):
+def performMutation(mutation, assetRepo, sessionManager):
 
     # Start timer for the mutation
     tic = time.perf_counter()
@@ -106,7 +108,10 @@ def performMutation(mutation, assetRepo, sessionManager, saveVel, saveLabel):
     assetRecord = None
     success = True
     combine = True
+    modelPredictionsScene = {}
+    modelPredictionsAsset = {}
 
+    # NON SCENE SPECIFIC
     # Adding asset to scene pick random sequence and scene as base
     if (assetLocation == mutationsEnum.AssetLocation.ADD.name):
 
@@ -132,6 +137,7 @@ def performMutation(mutation, assetRepo, sessionManager, saveVel, saveLabel):
             details["baseScene"] = scene
             pcdArr, intensity, semantics, instances = fileIoUtil.openLabelBinFiles(sessionManager.binFiles[idx], sessionManager.labelFiles[idx])
 
+
         # Select Asset, Given
         if (sessionManager.assetId != None):
             pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = assetRepo.getAssetById(sessionManager.assetId)
@@ -140,18 +146,49 @@ def performMutation(mutation, assetRepo, sessionManager, saveVel, saveLabel):
             pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = assetRepo.getRandomAsset()
             # pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = mongoUtil.getRandomAssetOfTypes([81])
 
+        if (assetRecord != None):
+            # Get model prediction (asset & scene)
+            _, instanceAssetScene = fileIoUtil.openLabel(sessionManager.labelPath, assetRecord["sequence"], assetRecord["scene"])
+            for model in models:
+                modelPredictionsScene[model] = fileIoUtil.openModelPredictions(sessionManager.basePredictionPath, model, details["baseSequence"], details["baseScene"])
+                modelAssetScene = fileIoUtil.openModelPredictions(sessionManager.basePredictionPath, model, assetRecord["sequence"], assetRecord["scene"])
+                modelPredictionsAsset[model] = modelAssetScene[instanceAssetScene == assetRecord["instance"]]
+
+    # SCENE SPECIFIC
     # Specific scene get asset then get the scene that asset is from
     elif (assetLocation == mutationsEnum.AssetLocation.SCENE.name or 
         assetLocation == mutationsEnum.AssetLocation.SIGN.name or
         assetLocation == mutationsEnum.AssetLocation.VEHICLE.name):
 
+        # GIVEN ASSET ID (OPTIONAL)
         if (sessionManager.assetId != None):
             pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = assetRepo.getAssetById(sessionManager.assetId)
+
+        # REMOVE OPTION TO TRY ALL ASSETS
+        elif(sessionManager.removeAll):
+            sessionManager.removeAllNum += 1
+            assetRecordResult = assetRepo.getAssetsPaged(sessionManager.removeAllNum, 1)
+
+            assetRecordList = list(assetRecordResult)
+            if (len(assetRecordList) > 0):
+                assetRecord = assetRecordList[0]
+                pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord =  assetRepo.getInstanceFromAssetRecord(assetRecord)
+            # if there are no more assets to try, but haven't hit the expected number, short ciruit
+            else:
+                sessionManager.expectedNum = successNum
+
+
+        # ONLY VEHICLE ASSETS
         elif (assetLocation == mutationsEnum.AssetLocation.VEHICLE.name):
             # pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = mongoUtil.getRandomAssetOfTypesWithinScene(globals.vehicles, sequence, scene)
             pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = assetRepo.getRandomAssetOfTypes(semanticMapping.instancesVehicle.keys())
+        
+
+        # ONLY SIGN ASSETS
         elif (assetLocation == mutationsEnum.AssetLocation.SIGN.name):
             pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = assetRepo.getRandomAssetOfType(81)
+        
+        # ANY ASSET
         else:
             pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = assetRepo.getRandomAsset()
             # pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, assetRecord = mongoUtil.getRandomAssetWithinScene(sequence, scene)
@@ -159,19 +196,25 @@ def performMutation(mutation, assetRepo, sessionManager, saveVel, saveLabel):
         
         if (assetRecord != None):
             pcdArr, intensity, semantics, instances = fileIoUtil.openLabelBin(sessionManager.binPath, sessionManager.labelPath, assetRecord["sequence"], assetRecord["scene"])
-            pcdArr, intensity, semantics, instances = pcdCommon.removeAssetScene(pcdArrAsset, pcdArr, intensity, semantics, instances)
+            instancesBeforeRemoval = np.copy(instances)
+            pcdArr, intensity, semantics, instances, sceneMask = pcdCommon.removeAssetScene(pcdArrAsset, pcdArr, intensity, semantics, instances)
             details["baseSequence"] = assetRecord["sequence"]
             details["baseScene"] = assetRecord["scene"]
+
+            # Get model prediction (asset & scene)
+            for model in models:
+                modelPredictionsScene[model] = fileIoUtil.openModelPredictions(sessionManager.basePredictionPath, model, details["baseSequence"], details["baseScene"])
+                modelPredictionsAsset[model] = modelPredictionsScene[model][instancesBeforeRemoval == assetRecord["instance"]]
+                # Remove asset from the scene 
+                modelPredictionsScene[model] = modelPredictionsScene[model][sceneMask]
+                # print("{} {} {} {}".format(np.shape(semantics), np.shape(modelPredictionsScene[model]), np.shape(semanticsAsset), np.shape(modelPredictionsAsset[model])))
 
 
     else:
         print("ERROR asset location: {} NOT SUPPORTED".format(assetLocation))
-        exit()
 
 
     
- 
-
     # Validate the asset was found
     if assetRecord == None:
         print("Invalid Asset / No asset found")
@@ -187,48 +230,79 @@ def performMutation(mutation, assetRepo, sessionManager, saveVel, saveLabel):
         # Points are collected for weight average on add, if sign is taken only the sign point are averaged, not the pole
         if (assetRecord["typeNum"] == 81):
             details["assetPoints"] = int(np.shape(pcdArrAsset[semanticsAsset == 81])[0])
-    
+
+
+
+
+
     # Perform the mutation
 
     for mutationIndex in range (1, len(mutationSplit)):
         if success:
-        # if (Transformations.INTENSITY == transformation):
+            # INTENSITY
             if (mutationSplit[mutationIndex] == mutationsEnum.Transformation.INTENSITY.name):
-                intensityAsset, details = pcdIntensity.intensityChange(intensityAsset, assetRecord["typeNum"], details, sessionManager.intensityChange)
+                intensityAsset, details = pcdIntensity.intensityChange(intensityAsset, details, sessionManager.intensityChange)
                 
+            # DEFORM
             elif (mutationSplit[mutationIndex] == mutationsEnum.Transformation.DEFORM.name):
                 pcdArrAsset, details = pcdDeform.deform(pcdArrAsset, details,
                                                         sessionManager.deformPoint, sessionManager.deformPercent, sessionManager.deformMu, 
                                                         sessionManager.deformSigma, sessionManager.deformSeed)
             
+            
+            # SCALE
             elif (mutationSplit[mutationIndex] == mutationsEnum.Transformation.SCALE.name):
-                success, pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, pcdArr, intensity, semantics, instances, details = pcdScale.scaleVehicle(pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, 
-                                                                                                                                                            pcdArr, intensity, semantics, instances, details,
-                                                                                                                                                            sessionManager.scaleLimit, sessionManager.scaleAmount) 
+                success, assetResult, sceneResult, details, modelPredictionsScene, modelPredictionsAsset = pcdScale.scaleVehicle(pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, 
+                                                                                                                                pcdArr, intensity, semantics, instances, details,
+                                                                                                                                sessionManager.scaleLimit, sessionManager.scaleAmount,
+                                                                                                                                modelPredictionsScene, modelPredictionsAsset) 
+                pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset = assetResult
+                pcdArr, intensity, semantics, instances = sceneResult
 
+
+            # REMOVE
             elif (mutationSplit[mutationIndex] == mutationsEnum.Transformation.REMOVE.name):
-                success, pcdArr, intensity, semantics, instances, details = pcdRemove.replaceBasedOnShadow(pcdArrAsset, pcdArr, intensity, semantics, instances, details)
+                success, pcdArr, intensity, semantics, instances, details, modelPredictionsScene = pcdRemove.replaceBasedOnShadow(pcdArrAsset, pcdArr, intensity, semantics, instances, 
+                                                                                                                                details, modelPredictionsScene)
                 # Don't combine if remove is the last transformation
                 if mutationIndex + 1 == len(mutationSplit):
                     combine = False
 
+            # MIRROR
             elif (mutationSplit[mutationIndex] == mutationsEnum.Transformation.MIRROR.name):
                 pcdArrAsset, details = pcdRotate.mirrorAsset(pcdArrAsset, details, sessionManager.mirrorAxis)
 
+            # ROTATE
             elif (mutationSplit[mutationIndex] == mutationsEnum.Transformation.ROTATE.name):
-                success, pcdArrAsset, pcdArr, intensity, semantics, instances, details = pcdRotate.rotate(pcdArr, intensity, semantics, instances, pcdArrAsset, details, sessionManager.rotation)
+                success, pcdArrAsset, sceneResult, details, modelPredictionsScene = pcdRotate.rotate(pcdArr, intensity, semantics, instances, 
+                                                                                                    pcdArrAsset, 
+                                                                                                    details, sessionManager.rotation, 
+                                                                                                    modelPredictionsScene)
+                pcdArr, intensity, semantics, instances = sceneResult
 
+
+            # REPLACE
             elif (mutationSplit[mutationIndex] == mutationsEnum.Transformation.REPLACE.name):
-                success, pcdArr, intensity, semantics, instances, pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, details = pcdSignReplace.signReplace(pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, 
-                                                                                                                                                            pcdArr, intensity, semantics, instances, details, sessionManager.signChange)
+                success, sceneResult, assetResult, details, modelPredictionsScene, modelPredictionsAsset = pcdSignReplace.signReplace(pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset, 
+                                                                                                                            pcdArr, intensity, semantics, instances, 
+                                                                                                                            details, sessionManager.signChange,
+                                                                                                                            modelPredictionsScene, modelPredictionsAsset)
+                pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset = assetResult
+                pcdArr, intensity, semantics, instances = sceneResult    
+
+
             else:
                 print("UNSUPPORTED TRANSFORMATION: {}".format(mutationSplit[mutationIndex]))
+                success = False
 
 
     # Combine the final results
     if success and combine:
         pcdArr, intensity, semantics, instances = pcdCommon.combine(pcdArr, intensity, semantics, instances, 
                                                                         pcdArrAsset, intensityAsset, semanticsAsset, instancesAsset)
+        # Combine model results
+        for model in models:
+            modelPredictionsScene[model] = np.hstack((modelPredictionsScene[model], modelPredictionsAsset[model]))
        
 
     # Visualize the mutation if enabled
@@ -242,17 +316,21 @@ def performMutation(mutation, assetRepo, sessionManager, saveVel, saveLabel):
     timeFormatted = formatSecondsToHhmmss(timeSeconds)
     # print("Mutation took {}".format(timeFormatted))
 
-    # New bin and modified label to return 
-    xyziFinal = None
-    labelFinal = None
 
     # Combine the xyz, intensity and semantics, instance labels labels and bins
     if (success):
         details["seconds"] = timeSeconds
         details["mutationTime"] = timeFormatted
         if (sessionManager.saveMutationFlag):
-            xyziFinal, labelFinal = fileIoUtil.prepareToSave(pcdArr, intensity, semantics, instances)
-            fileIoUtil.saveBinLabelPair(xyziFinal, labelFinal, saveVel, saveLabel, details["_id"])
+            # Save mutated bin and update label file
+            saveVel = sessionManager.stageDir + "/"
+            saveLabel = sessionManager.doneLabelDir + "/"
+            fileIoUtil.saveBinLabelPair(pcdArr, intensity, semantics, instances, saveVel, saveLabel, details["_id"])
+            # Save updated model predictions
+            for model in models:
+                saveAtModel = sessionManager.doneMutatedPredDir + "/" + model + "/"
+                fileIoUtil.saveLabelSemantics(modelPredictionsScene[model], saveAtModel, details["_id"])
+                
 
     return success, details
     
@@ -265,13 +343,6 @@ Colors based on semantics
 Or by intensity if inensity was altered
 """
 def visualize(pcdArrAsset, pcdArr, intensity, semantics, mutationSet):
-
-
-
-
-    print("here????")
-    print(np.shape(semantics[(semantics == 81)]))
-    print(semantics[(semantics == 81)])
 
 
     # Get asset box
@@ -302,14 +373,14 @@ def visualize(pcdArrAsset, pcdArr, intensity, semantics, mutationSet):
 
 
 # def batchMutation(threadNum, mutex, sessionManager, mutationDetails, bins, labels, assetRepo):
-def batchMutation(threadNum, sessionManager, mutationDetails, assetRepo, saveVel, saveLabel):
+def batchMutation(threadNum, sessionManager, mutationDetails, assetRepo):
     global successNum
     global attemptedNum
     global batchCount
     global potentialSuccess
 
     # mutex.acquire()
-    print("Starting {} Thread Num, saving at {}".format(threadNum, saveLabel))
+    print("Starting {} Thread Num, saving at {}".format(threadNum, sessionManager.stageDir))
 
     while(batchCount + potentialSuccess < sessionManager.batchNum and successNum + potentialSuccess < sessionManager.expectedNum):
         potentialSuccess += 1
@@ -319,7 +390,7 @@ def batchMutation(threadNum, sessionManager, mutationDetails, assetRepo, saveVel
         mutation = mutationEnum.name
         
         success = False
-        success, details = performMutation(mutation, assetRepo, sessionManager, saveVel, saveLabel)
+        success, details = performMutation(mutation, assetRepo, sessionManager)
 
         # mutex.acquire()
         potentialSuccess -= 1
@@ -332,15 +403,18 @@ def batchMutation(threadNum, sessionManager, mutationDetails, assetRepo, saveVel
             mutationDetails.append(details)
             # bins.append(xyziFinal)
             # labels.append(labelFinal)
-        # else:
-        #     print("\n\nThread {}, Attempt {} (unsuccessful) [curr successful {}]".format(threadNum, attemptedNum, successNum))
-        #     print(details)
+        else:
+            print("\n\nThread {}, Attempt {} (unsuccessful) [curr successful {}]".format(threadNum, attemptedNum, successNum))
+            print(details)
     
     # mutex.release()
 
 
 
-def evalBatch(sessionManager, mutationDetails, finalData, queue):
+def evalBatch(sessionManager, mutationDetails, finalData, queue, complete, total):
+    # Catch for 0 mutations
+    if (len(mutationDetails) < 1):
+        return
 
     # PyMongo not process safe
     # Need to recreate here
@@ -348,17 +422,22 @@ def evalBatch(sessionManager, mutationDetails, finalData, queue):
 
     # Evaluate
     if (sessionManager.evalMutationFlag):
-        details = eval.evalBatch(mutationDetails, sessionManager)
+        details = eval.evalBatch(mutationDetails, sessionManager,  complete, total)
         deleteFiles = finalData.updateFinalDetails(details)
-        fileIoUtil.removeFiles(deleteFiles)
+        
+        if (not sessionManager.saveAll):
+            fileIoUtil.removeFiles(deleteFiles)
 
     # Save details
     if (sessionManager.saveMutationFlag):
         detailsRepo.saveMutationDetails(mutationDetails)
     
-    ret = queue.get()
+    print("Put Final Data")
+    ret = {}
     ret['finalData'] = finalData
     queue.put(ret)
+    print("Eval batch done")
+
 
 
 
@@ -380,11 +459,18 @@ def runMutations(sessionManager):
 
     errors = []
 
+
+
+    mp.set_start_method('forkserver')
+    mpManager = mp.Manager()
+
+   
+
     
     # muti processing 
     ret = {}
     ret["finalData"] = finalData
-    queue = Queue()
+    queue = mpManager.Queue()
     queue.put(ret)
 
 
@@ -416,40 +502,42 @@ def runMutations(sessionManager):
         #     thread.join()
 
         threadNum = (threadNum + 1) % 2
-        saveVel = sessionManager.stageDir + "/velodyne/"
-        saveLabel = sessionManager.stageDir + "/labels/"
 
-        batchMutation(0, sessionManager, mutationDetails, assetRepo, saveVel, saveLabel)
+        batchMutation(0, sessionManager, mutationDetails, assetRepo)
 
         # End timer for mutation batch generation
         toc = time.perf_counter()
         timeSeconds = toc - tic
         timeFormatted = formatSecondsToHhmmss(timeSeconds)
-        # print("Batch took {}".format(timeFormatted))
+        print("Batch took {}".format(timeFormatted))
 
         # Mutate
         # for index in range(0, globals.batchNum):
 
+        
         if (sessionManager.asyncEval):
+            print("\n\nJoin Process {}", len(processList))
             for process in processList:
                 process.join()
+            print("Get queue\n\n")
             ret = queue.get()
             finalData = ret["finalData"]
-            queue.put(ret)
             print("Starting evaluation Success: {} / {}".format(successNum, sessionManager.expectedNum))
             # thread = threading.Thread(target=evalBatch, args=(sessionManager, mutationDetails, bins, labels, evalNum, detailsRepo))
-            process = Process(target=evalBatch, args=(sessionManager, mutationDetails, finalData, queue))
-            processList = [process]
+            process = mp.Process(target=evalBatch, args=(sessionManager, mutationDetails, finalData, queue, successNum, sessionManager.expectedNum))
+            # processList = [process]
             process.start()
         else:
-            evalBatch(sessionManager, mutationDetails, finalData, queue)
+            evalBatch(sessionManager, mutationDetails, finalData, queue, successNum, sessionManager.expectedNum)
 
         # evalBatch(sessionManager, mutationDetails)
 
     if (sessionManager.asyncEval):
         # Wait on last Eval batch
+        print("Join Process last")
         for process in processList:
             process.join()
+        print("Get queue last")
         ret = queue.get()
         finalData = ret["finalData"]
 

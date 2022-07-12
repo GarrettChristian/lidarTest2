@@ -116,7 +116,15 @@ def handleOne(mutation, mutationId, mutationRepo):
     imgs = []
     font = ImageFont.truetype("/usr/share/fonts/truetype/freefont/FreeSansBold.ttf", 16)
     
+
+    
     saveDir = finalVisDir + "/" + mutation + "/" + mutationId + "/"
+
+    imgBuffer = Image.new(mode="RGBA", size=(1024, 20), color=(255, 255, 255))
+    drawBuff = ImageDraw.Draw(imgBuffer)
+    textBuff = "Id {}, Seq {}, Scene {}, AssetId {}".format(mutationId, item["baseSequence"], item["baseScene"], item["asset"])
+    drawBuff.text((0, 0), textBuff, (0, 0, 0), font=font)
+    imgs.append(np.asarray(imgBuffer))
 
     
     # Intensity Version
@@ -131,7 +139,7 @@ def handleOne(mutation, mutationId, mutationRepo):
     # new-id : new scan with new labels
     newScanIntensity = saveDir + "actual-new-intensity" + mutationId + ".png"
     vis.set_new_pcd(scan_name=toolDir + "done/velodyne/" + mutationId + ".bin",
-                    label_name=toolDir + "done/labels/actual/" + mutationId + ".label")
+                    label_name=toolDir + "done/labels/" + mutationId + ".label")
     vis.save(newScanIntensity)
 
     ogImageIntensity = Image.open(origScanIntensity)
@@ -155,7 +163,7 @@ def handleOne(mutation, mutationId, mutationRepo):
     # new-id : new scan with new labels
     newScan = saveDir + "actual-new-" + mutationId + ".png"
     vis.set_new_pcd(scan_name=toolDir + "done/velodyne/" + mutationId + ".bin",
-                    label_name=toolDir + "done/labels/actual/" + mutationId + ".label")
+                    label_name=toolDir + "done/labels/" + mutationId + ".label")
     vis.save(newScan)
 
     ogImage = Image.open(origScan)
@@ -167,20 +175,27 @@ def handleOne(mutation, mutationId, mutationRepo):
     imgs.append(np.asarray(ogImage))
     imgs.append(np.asarray(newImage))
 
-
+    
     for model in models:
 
-        if "ADD" in mutation:
-            # og-model-asset-id : original asset scan with model labels (x3)
-            ogModelAssetSave = saveDir + model + "-asset-" + mutationId + ".png"
-            vis.set_new_pcd(scan_name=dataDir + item["assetSequence"] + "/velodyne/" + item["assetScene"] + ".bin",
-                        label_name=labelsDir + item["assetSequence"] + "/" + model + "/" + item["assetScene"] + ".label")
-            vis.save(ogModelAssetSave)
+        imgBuffer = Image.new(mode="RGBA", size=(1024, 20), color=(255, 255, 255))
+        drawBuff = ImageDraw.Draw(imgBuffer)
+        textBuff = "Model: {}, Acc Loss {:.2f}%, Jacc Loss {:.2f}%, Predictions:".format(model, item[model]["percentLossAcc"], item[model]["percentLossJac"])
+        drawBuff.text((0, 0), textBuff, (0, 0, 0), font=font)
+        imgs.append(np.asarray(imgBuffer))
 
-            assetModelImage = Image.open(ogModelAssetSave)
-            drawAsset = ImageDraw.Draw(assetModelImage)
-            drawAsset.text((0, 0), "Asset " + model, (255,255,255), font=font)
-            imgs.append(np.asarray(assetModelImage))
+        # if "ADD" in mutation:
+        #     # og-model-asset-id : original asset scan with model labels (x3)
+        #     ogModelAssetSave = saveDir + model + "-asset-" + mutationId + ".png"
+        #     vis.set_new_pcd(scan_name=dataDir + item["assetSequence"] + "/velodyne/" + item["assetScene"] + ".bin",
+        #                 label_name=labelsDir + item["assetSequence"] + "/" + model + "/" + item["assetScene"] + ".label")
+        #     vis.save(ogModelAssetSave)
+
+        #     assetModelImage = Image.open(ogModelAssetSave)
+        #     drawAsset = ImageDraw.Draw(assetModelImage)
+        #     drawAsset.text((0, 0), "Asset " + model, (255,255,255), font=font)
+        #     imgs.append(np.asarray(assetModelImage))
+
 
         # og-model-id : original scan with model labels (x3)
         ogModelSave = saveDir + model + "-og-" + mutationId + ".png"
@@ -190,19 +205,35 @@ def handleOne(mutation, mutationId, mutationRepo):
 
         ogModelImage = Image.open(ogModelSave)
         drawOg = ImageDraw.Draw(ogModelImage)
-        drawOg.text((0, 0), "Orig " + model, (255,255,255), font=font)
+        drawOg.text((0, 0), "Orig", (255,255,255), font=font)
         imgs.append(np.asarray(ogModelImage))
+
+
+        if "INTENSITY" not in mutation and "DEFORM" not in mutation:
+            # The assets modified prediction
+            # og-model-modpred-id : mutated pred (x3)
+            ogModelModPredSave = saveDir + model + "-modpred-" + mutationId + ".png"
+            vis.set_new_pcd(scan_name=toolDir + "done/velodyne/" + mutationId + ".bin",
+                            label_name=toolDir + "done/mutatedPred/" + model + "/" + mutationId + ".label")
+            vis.save(ogModelModPredSave)
+
+            modelModPredImage = Image.open(ogModelModPredSave)
+            drawAsset = ImageDraw.Draw(modelModPredImage)
+            drawAsset.text((0, 0), "Adj", (255,255,255), font=font)
+            imgs.append(np.asarray(modelModPredImage))
+
 
         # new-model-id : new scan with model labels (x3)
         newModelSave = saveDir + model + "-new-" + mutationId + ".png"
         vis.set_new_pcd(scan_name=toolDir + "done/velodyne/" + mutationId + ".bin",
-                        label_name=toolDir + "done/labels/" + model + "/" + mutationId + ".label")
+                        label_name=toolDir + "done/pred/" + model + "/" + mutationId + ".label")
         vis.save(newModelSave)
         
         newModelImage = Image.open(newModelSave)        
         drawNew = ImageDraw.Draw(newModelImage)        
-        drawNew.text((0, 0), "New " + model, (255,255,255), font=font)
+        drawNew.text((0, 0), "New", (255,255,255), font=font)
         imgs.append(np.asarray(newModelImage))
+
 
 
 

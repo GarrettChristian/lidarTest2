@@ -10,8 +10,11 @@ Collecting analytics such as top changes and averages
 import sys
 import time
 
+from domain.modelConstants import models
+from domain.mutationsEnum import Mutation
 
-models = ["cyl", "spv", "sal"]
+# --------------------------------------------------------------------------
+
 accJaccKeyList = ["accuracy", "jaccard"]
 
 
@@ -78,6 +81,7 @@ class FinalDetails:
         self.mutationsEnabled = set()
         self.topNum = topNum
         self.buckets = list(range(0, 7))
+        self.duplicateSets = {}
         self.prepFinalDetails()
 
         # If removing non top bins/labels
@@ -194,8 +198,10 @@ class FinalDetails:
                 self.finalData[mutation][accJaccKey][bucketKey]["model_overlap"] = {}
                 self.finalData[mutation][accJaccKey][bucketKey]["model_threshold_overlap"] = {}
         
-
-
+        # Add new duplicate set
+        self.duplicateSets[mutation] = set()
+        self.finalData[mutation]["duplicates"] = 0
+        self.finalData[mutation]["duplicatesPercent"] = 0
 
 
 
@@ -216,7 +222,6 @@ class FinalDetails:
         accJaccTopKeyList = ["top_acc", "top_jac"]
         
         for detail in details:
-            # Add count for mutation
             
             # Model mutation bucket overlap 
             modelBuckets = {}
@@ -230,6 +235,9 @@ class FinalDetails:
             mutation = detail["mutation"]
             if mutation not in self.mutationsEnabled:
                 self.addMutation(mutation)
+
+            # Update the duplicate counter
+            self.checkForDuplicate(detail, mutation)
 
             # Check the accuracy of each model
             for model in models:
@@ -309,8 +317,6 @@ class FinalDetails:
                     self.finalData[mutation][accJaccKey][bucketKey]["avg_seconds"] = detail["seconds"] + self.finalData[mutation][accJaccKey][bucketKey]["avg_seconds"]
 
 
-
-
             # Total count
             self.finalData[mutation]["accuracy"]["all"]["total"] = 1 + self.finalData[mutation]["accuracy"]["all"]["total"]
             self.finalData[mutation]["jaccard"]["all"]["total"] = 1 + self.finalData[mutation]["jaccard"]["all"]["total"]
@@ -368,6 +374,27 @@ class FinalDetails:
         return deleteFiles
 
 
+    """
+    Updates the duplicate set based on the mutation 
+    """
+    def checkForDuplicate(self, details, mutation):
+
+        if mutation == Mutation.ADD_ROTATE.name:
+            self.duplicateSets[mutation].add((details["asset"], details["baseSequence"], details["baseScene"], details["rotate"]))
+        elif mutation == Mutation.ADD_MIRROR_ROTATE.name:
+            self.duplicateSets[mutation].add((details["asset"], details["baseSequence"], details["baseScene"], details["rotate"], details["mirror"]))
+        elif mutation == Mutation.SCENE_REMOVE.name:
+            self.duplicateSets[mutation].add((details["asset"]))
+        elif mutation == Mutation.SIGN_REPLACE.name:
+            self.duplicateSets[mutation].add((details["asset"], details["sign"]))
+        elif mutation == Mutation.VEHICLE_SCALE.name:
+            self.duplicateSets[mutation].add((details["asset"], details["scale"]))
+        elif mutation == Mutation.VEHICLE_INTENSITY.name:
+            self.duplicateSets[mutation].add((details["asset"], details["intensity"]))
+        elif mutation == Mutation.VEHICLE_DEFORM.name:
+            self.duplicateSets[mutation].add((details["asset"], details["deformPercent"], details["deformPoint"], details["deformMu"], details["deformSigma"], details["deformSeed"]))
+        else:
+            print("{} not a supported mutation".format(details["mutation"]))
 
 
     """
@@ -376,6 +403,8 @@ class FinalDetails:
     def finalizeFinalDetails(self):
 
         for mutation in self.mutationsEnabled:
+
+            allCount = 0
 
             for accJaccKey in accJaccKeyList:
 
@@ -411,6 +440,11 @@ class FinalDetails:
                             self.finalData[mutation][accJaccKey][bucketKey]["avg_" + model] = self.finalData[mutation][accJaccKey][bucketKey]["avg_" + model] / bucketCountModel
 
 
+            # Get duplicate counts
+            duplicates = (allCount - len(self.duplicateSets[mutation]))
+            self.finalData[mutation]["duplicates"] = duplicates
+            if (allCount > 0):
+                self.finalData[mutation]["duplicatesPercent"] = (duplicates / allCount) * 100
 
 
         return self.finalData
@@ -430,7 +464,10 @@ class FinalDetails:
     def setAttempts(self, successCount, attemptCount):
         self.finalData["count"] = successCount
         self.finalData["count_attempted"] = attemptCount
-        self.finalData["percent_success"] = (successCount / attemptCount) * 100
+        self.finalData["percent_success"] = 0
+        if (attemptCount > 0):
+            self.finalData["percent_success"] = (successCount / attemptCount) * 100
+            
 
 
 

@@ -13,10 +13,14 @@ from os.path import basename
 import shutil
 from operator import itemgetter
 import time
+import subprocess
 
 import service.eval.ioueval as ioueval
 
+from domain.modelConstants import models
+
 import data.baseAccuracyRepository as baseAccuracyRepository
+import data.fileIoUtil as fileIoUtil
 
 from domain.semanticMapping import learning_map_inv
 from domain.semanticMapping import learning_map_inv
@@ -39,6 +43,28 @@ modelSpv = "spv"
 modelSal = "sal"
 
 
+ 
+# --------------------------------------------------------------------------
+# Constants for the ioueval evaluator
+
+numClasses = len(learning_map_inv)
+
+# make lookup table for mapping
+maxkey = max(learning_map.keys())
+
+# +100 hack making lut bigger just in case there are unknown labels
+remap_lut = np.zeros((maxkey + 100), dtype=np.int32)
+remap_lut[list(learning_map.keys())] = list(learning_map.values())
+
+# create evaluator
+ignore = []
+for cl, ign in learning_ignore.items():
+    if ign:
+        x_cl = int(cl)
+        ignore.append(x_cl)
+
+evaluator = ioueval.iouEval(numClasses, ignore)
+
 # --------------------------------------------------------------------------
 # Runners
 
@@ -56,10 +82,12 @@ def runCyl(sessionManager):
     os.chdir(pathToModels + "/" + modelCylinder3D)
 
     # runCommand += "2> /dev/null"
+    print(pathToModels + "/" + modelCylinder3D)
 
     # Run Model
-    os.system(runCommand)
-    
+    # os.system(runCommand)
+    subprocess.Popen(runCommand, shell=True).wait()
+
 
 """
 Runner for the SPVNAS model
@@ -79,7 +107,8 @@ def runSpv(sessionManager):
     # runCommand += "2> /dev/null"
 
     # Run Model
-    os.system(runCommand)
+    # os.system(runCommand)
+    subprocess.Popen(runCommand, shell=True).wait()
 
 
 """
@@ -103,11 +132,69 @@ def runSal(sessionManager):
     # runCommand += "2> /dev/null"
 
     # Run Model
-    os.system(runCommand)
+    # os.system(runCommand)
+    subprocess.Popen(runCommand, shell=True).wait()
 
 
 # --------------------------------------------------------------------------
 # Evaluators
+
+
+def evalLabels(modifiedLabel, modifiedPrediction, newPrediction):
+
+    # Set up results
+    results = {}
+    results["mod"] = {}
+    results["mod"]["classes"] = {}
+    results["new"] = {}
+    results["new"]["classes"] = {}
+
+    accMod, jaccMod, classJaccMod = evaluateLabelPred(modifiedLabel, modifiedPrediction)
+    accNew, jaccNew, classJaccNew = evaluateLabelPred(modifiedLabel, newPrediction)
+
+    # save classwise jaccard
+    for i, jacc in enumerate(classJaccMod):
+        if i not in ignore:
+            results["mod"][name_label_mapping[learning_map_inv[i]]] = jacc
+    for i, jacc in enumerate(classJaccNew):
+        if i not in ignore:
+            results["new"][name_label_mapping[learning_map_inv[i]]] = jacc
+    # Save acc
+    results["mod"]["accuracy"] = accMod
+    results["new"]["accuracy"] = accNew
+    # Save jacc
+    results["mod"]["jaccard"] = jaccMod
+    results["new"]["jaccard"] = jaccNew
+    
+    # Get percent loss
+    results["accuracyChange"] = accNew - accMod
+    results["jaccardChange"] = jaccNew - jaccMod
+    results["percentLossAcc"] = results["accuracyChange"] * 100
+    results["percentLossJac"] = results["jaccardChange"] * 100
+
+    return results
+    
+
+
+def evaluateLabelPred(labelFile, predictionFile):
+    global evaluator
+
+    groundTruth, _ = fileIoUtil.openLabelFile(labelFile)
+    prediction, _ = fileIoUtil.openLabelFile(predictionFile)
+
+    # Map to correct classes for evaluation,
+    # Example classification "moving-car" -> "car"
+    groundTruthMapped = remap_lut[groundTruth] # remap to xentropy format
+    predictionMapped = remap_lut[prediction] # remap to xentropy format
+
+    # Prepare evaluator
+    evaluator.reset()
+    evaluator.addBatch(predictionMapped, groundTruthMapped)
+    m_accuracy = evaluator.getacc()
+    m_jaccard, class_jaccard = evaluator.getIoU()
+
+    return m_accuracy, m_jaccard, class_jaccard
+
 
 
 """
@@ -122,15 +209,13 @@ https://github.com/PRBonn/semantic-kitti-api/blob/master/evaluate_semantics.py
 @param details dictionary that enumerates what occured in this transformation
 @return results with accuracy results for this model and pair of labels
 """
-def evalLabels(label_file, pred_file, baseAccuracy, baseAccuracyAsset, typeNum, mutation, assetPoints):
+def evalLabelsOld(label_file, pred_file, baseAccuracy, baseAccuracyAsset, typeNum, mutation, assetPoints):
 
     # print()
     # print(label_file)
     # print(pred_file)
 
 
-    fileName = basename(label_file)
-    fileName = fileName.replace(".label", "")
 
     numClasses = len(learning_map_inv)
 
@@ -318,20 +403,16 @@ Note all bins and labels must be in:
 @param details list of detail dictionarys that enumerates what occured in this transformation
 @return details updated with the results from the models
 """
-def evalBatch(details, sessionManager):
+def evalBatch(details, sessionManager,  complete, total):
 
-    baseAccRepository = baseAccuracyRepository.BaseAccuracyRepository(sessionManager.mongoConnect)
-
-    # Lock mutex
     print("\n\nBegin Evaluation:")
 
+    # Get the new predictions
 
-    # move the bins to the velodyne folder to run the models on them
-    print("move to vel folder")
-    stageVel = sessionManager.stageDir + "/velodyne/"
-    # allfiles = os.listdir(stageVel)
+    # Move the bins that are in this collection of details to the current velodyne folder to run the models on them
+    print("Move bins to evaluate to the current folder")
     for detail in details:
-        shutil.move(stageVel + detail["_id"] + ".bin", sessionManager.currentVelDir + "/" + detail["_id"] + ".bin")
+        shutil.move(sessionManager.stageDir + "/" + detail["_id"] + ".bin", sessionManager.currentVelDir + "/" + detail["_id"] + ".bin")
 
     # run all models on bin files
     print("Run models")
@@ -339,26 +420,8 @@ def evalBatch(details, sessionManager):
     runSpv(sessionManager)
     runSal(sessionManager)
 
-    # Move the model label files to the evaluation folder   
-    # print("Move to eval folder")
-    # evalCylDir = sessionManager.evalDir + "/label/" + modelCyl + "/"
-    # evalSpvDir = sessionManager.evalDir + "/label/" + modelSpv + "/"
-    # evalSalDir = sessionManager.evalDir + "/label/" + modelSal + "/"
 
-    # allfiles = os.listdir(sessionManager.resultCylDir + "/")
-    # for f in allfiles:
-    #     shutil.move(sessionManager.resultCylDir + "/" + f, evalCylDir + f)
-
-    # allfiles = os.listdir(sessionManager.resultSpvDir + "/")
-    # for f in allfiles:
-    #     shutil.move(sessionManager.resultSpvDir + "/" + f, evalSpvDir + f)
-
-    # allfiles = os.listdir(sessionManager.resultSalDir + "/predictions/")
-    # for f in allfiles:
-    #     shutil.move(sessionManager.resultSalDir + "/predictions/" + f, evalSalDir + f)
-       
-
-    # Move bins to done from the model folder
+    # Move bins to done from the current folder
     print("Move bins to done")
     allfiles = os.listdir(sessionManager.currentVelDir + "/")
     for f in allfiles:
@@ -368,69 +431,53 @@ def evalBatch(details, sessionManager):
 
     # Evaluate 
     print("Eval")
-    stageLabel = sessionManager.stageDir + "/labels/"
+
+    # Get the labels (modified ground truth)
     labelFiles = []
     for detail in details:
-        labelFiles.append(stageLabel + detail["_id"] + ".label")
-        # shutil.move(stageVel + detail["_id"] + ".bin", sessionManager.currentVelDir + "/" + detail["_id"] + ".bin")
-    # labelFiles = glob.glob(stageLabel + "*.label")
-    predFilesCyl = glob.glob(sessionManager.resultCylDir + "/" + "*.label")
-    predFilesSpv = glob.glob(sessionManager.resultSpvDir + "/" + "*.label")
-    predFilesSal = glob.glob(sessionManager.resultSalDir + "/predictions/" + "*.label")
+        labelFiles.append(sessionManager.doneLabelDir + "/" + detail["_id"] + ".label")
+
+
+    # Get the modified predictions for the models
+    # Set up modified pred dict
+    modifiedPred = {}
+    for model in models:
+        modifiedPred[model] = []
+    # Get the modified pred file paths
+    for detail in details:
+        for model in models:
+            modifiedPred[model].append(sessionManager.doneMutatedPredDir + "/" + model + "/" + detail["_id"] + ".label")
     
-    # Order the update files cronologically
+
+    # Get the predictions made for these scenes
+    predFilesCyl = glob.glob(sessionManager.resultCylDir + "/*.label")
+    predFilesSpv = glob.glob(sessionManager.resultSpvDir + "/*.label")
+    predFilesSal = glob.glob(sessionManager.resultSalDir + "/predictions/*.label")
+
+
+    # Sort the labels, modified predictions, and new predictions
     labelFiles = sorted(labelFiles)
     predFiles = {}
     predFiles["cyl"] = sorted(predFilesCyl)    
     predFiles["spv"] = sorted(predFilesSpv)
     predFiles["sal"] = sorted(predFilesSal)
+    for model in models:
+        modifiedPred[model] = sorted(modifiedPred[model])
     details = sorted(details, key=itemgetter('_id')) 
+
+
+    # Evaluate the labels, modified predictions, and new predictions
     for index in range(0, len(labelFiles)):
-        print("{}/{}, {}".format(index, len(labelFiles), details[index]["_id"]))
+        print("{}/{}, {} | {}/{}".format(index, len(labelFiles), details[index]["_id"],  complete, total))
 
-        # Get the base accuracy for a given scene
-        baseAccuracy = baseAccRepository.getBaseAccuracy(details[index]["baseSequence"], details[index]["baseScene"])
-
-        baseAccuracyAsset = None
-        if "ADD" in details[index]["mutation"]:
-            baseAccuracyAsset = baseAccRepository.getBaseAccuracy(details[index]["assetSequence"], details[index]["assetScene"])
-
-        for model in sessionManager.models:
-            # Get the base accuracy for a specific model
-            baseAccModel = baseAccuracy[model]
-            baseAccAssetModel = None
-            if baseAccuracyAsset != None:
-                baseAccAssetModel = baseAccuracyAsset[model]
-            
+        for model in models:
             # Get the accuracy differentials
-            modelResults = evalLabels(labelFiles[index], predFiles[model][index], baseAccModel, baseAccAssetModel, 
-                                        details[index]["typeNum"], details[index]["mutation"], details[index]["assetPoints"])
+            modelResults = evalLabels(labelFiles[index], modifiedPred[model][index], predFiles[model][index])
+            # Update the details
             details[index][model] = modelResults
 
-        # Move to done folder
-        shutil.move(labelFiles[index], sessionManager.doneLabelActualDir + "/" + details[index]["_id"] + ".label")
-        shutil.move(predFiles[modelCyl][index], sessionManager.doneLabelDir + "/" + modelCyl + "/" + details[index]["_id"] + ".label")
-        shutil.move(predFiles[modelSpv][index], sessionManager.doneLabelDir + "/" + modelSpv + "/" + details[index]["_id"] + ".label")
-        shutil.move(predFiles[modelSal][index], sessionManager.doneLabelDir + "/" + modelSal + "/" + details[index]["_id"] + ".label")
-    
-
-    # Move to done folder
-    # print("Move to done folder")    
-    # allfiles = os.listdir(stageLabel)
-    # for f in allfiles:
-        
-
-    # allfiles = os.listdir(evalCylDir)
-    # for f in allfiles:
-    #     shutil.move(evalCylDir + f, sessionManager.doneLabelDir + "/" + modelCyl + "/" + f)
-
-    # allfiles = os.listdir(evalSpvDir)
-    # for f in allfiles:
-    #     shutil.move(evalSpvDir + f, sessionManager.doneLabelDir + "/" + modelSpv + "/" + f)
-
-    # allfiles = os.listdir(evalSalDir)
-    # for f in allfiles:
-    #     shutil.move(evalSalDir + f, sessionManager.doneLabelDir + "/" + modelSal + "/" + f)
+            # Move model prediction to the done folder
+            shutil.move(predFiles[model][index], sessionManager.donePredDir + "/" + model + "/" + details[index]["_id"] + ".label")
 
 
     return details

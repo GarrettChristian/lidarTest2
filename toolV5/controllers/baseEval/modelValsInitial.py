@@ -102,11 +102,12 @@ def eval(label_file, pred_file):
 
     # when I am done, print the evaluation
     m_accuracy = evaluator.getacc()
-    m_jaccard, m_jaccard_modified, class_jaccard = evaluator.getIoU()
+    # m_jaccard, m_jaccard_modified, class_jaccard = evaluator.getIoU()
+    m_jaccard, class_jaccard = evaluator.getIoU()
 
     results = {}
     results["jaccard"] = m_jaccard.item()
-    results["jaccardAlt"] = m_jaccard_modified.item()
+    # results["jaccardAlt"] = m_jaccard_modified.item()
     results["accuracy"] = m_accuracy.item()
 
     # print also classwise

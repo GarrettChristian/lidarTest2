@@ -28,6 +28,7 @@ class SessionManager:
 
         self.binPath = args.binPath
         self.labelPath = args.labelPath
+        self.basePredictionPath = args.predPath
 
         self.assetId = None
         self.scene = None
@@ -64,6 +65,9 @@ class SessionManager:
         self.deformSigma = None
         self.deformSeed = None
 
+        self.removeAll = args.removeAll
+        self.removeAllNum = 0
+
         if (not recreation):
             # Mutations to choose from
             print("Selecting mutations to use")
@@ -72,8 +76,8 @@ class SessionManager:
             # Batch and total counts
             self.batchNum = int(args.b)
             self.expectedNum = int(args.count)
-            print("Will run until {} successful mutations are obtained".format({self.expectedNum}))
-            print("Batch evaluating and saving every {}".format({self.batchNum}))
+            print("Will run until {} successful mutations are obtained".format(self.expectedNum))
+            print("Batch evaluating and saving every {}".format(self.batchNum))
 
             # Specific mutation arguments
             self.rotation = args.rotate
@@ -94,6 +98,7 @@ class SessionManager:
             self.threads = args.t 
             self.verbose = args.verbose
             self.asyncEval = args.asyncEval
+            self.saveAll = args.saveAll
 
             # Flags for convience 
             self.saveMutationFlag = args.ns
@@ -115,13 +120,14 @@ class SessionManager:
             self.resultSpvDir = ""
             self.resultSalDir = ""
             self.evalDir = ""
-            self.doneLabelActualDir = ""
             self.dataDir = ""
             self.doneLabelDir = ""
+            self.donePredDir = ""
+            self.doneMutatedPredDir = ""
 
             if (self.saveMutationFlag):
                 print("Setting up result folder pipeline")
-                self.setUpDataFolders(self.threads)
+                self.setUpDataFolders()
 
 
 
@@ -193,74 +199,54 @@ class SessionManager:
 
 
 
-    def setUpDataFolders(self, threads):
+    def setUpDataFolders(self):
 
         """
         /output
             /staging
-                /velodyne
-                /labels
-            /current/dataset/sequences/00
-                /velodyne
+            /current/dataset/sequences/00/velodyne
             /results
                 /cyl
                 /spv
                 /sal/sequences/00
-            # /eval
-            #     /labels
-            #         /cyl
-            #         /spv
-            #         /sal
             /done
                 /velodyne
                 /labels
-                    /actual
+                /pred
+                    /cyl
+                    /spv
+                    /sal
+                /mutatedPred
                     /cyl
                     /spv
                     /sal
         """
 
-        # make a top level data dir
+        # make a top level output dir
         self.dataDir = self.saveAt + "/output"
         isExist = os.path.exists(self.dataDir)
         if not isExist:
             os.makedirs(self.dataDir)
 
         """
-        /data
+        /output
             /staging
-                    /velodyne0
-                    /labels0
         """
 
         # staging
         self.stageDir = self.dataDir + "/staging"
-        isExist = os.path.exists(self.stageDir)
-        if not isExist:
-            os.makedirs(self.stageDir)
+        if os.path.exists(self.stageDir):
+            shutil.rmtree(self.stageDir)
+            print("Removing {}".format(self.stageDir))     
+        os.makedirs(self.stageDir)
 
-        # for thread in range(0, threads):
-        # staging vel
-        self.stageVel = self.stageDir + "/velodyne"
-        if os.path.exists(self.stageVel):
-            shutil.rmtree(self.stageVel)
-            print("Removing {}".format(self.stageVel))
-        os.makedirs(self.stageVel)
-
-        # staging label
-        self.stagelabel = self.stageDir + "/labels"
-        if os.path.exists(self.stagelabel):
-            shutil.rmtree(self.stagelabel)
-            print("Removing {}".format(self.stagelabel))
-        os.makedirs(self.stagelabel)
 
         """
-        /data
-            /current/dataset/sequences/00
-                /velodyne
+        /output
+            /current/dataset/sequences/00/velodyne
         """
 
-        # current
+        # The directory that the models use to evaluate the bins
         self.dataRoot = self.dataDir + "/current/dataset"
         currentDir = self.dataRoot + "/sequences/00"
         os.makedirs(currentDir, exist_ok=True)
@@ -271,7 +257,7 @@ class SessionManager:
         os.makedirs(self.currentVelDir)
 
         """
-        /data
+        /output
             /results
                 /cyl
                 /spv
@@ -305,38 +291,16 @@ class SessionManager:
             print("Removing {}".format(self.resultSalDir))
         os.makedirs(self.resultSalDir, exist_ok=True)
 
-
-        # """
-        # /data
-        #     /eval
-        #         /labels0
-        #             /cyl
-        #             /spv
-        #             /sal
-        # """
-
-        # # eval
-        # self.evalDir = self.dataDir + "/eval"
-        # if os.path.exists(self.evalDir):
-        #     shutil.rmtree(self.evalDir, ignore_errors=True)
-        #     print("Removing {}".format(self.evalDir))
-        # os.makedirs(self.evalDir, exist_ok=True)
-
-        # # for thread in range(0, threads):
-        # # staging vel
-        # labelThreadDir = self.evalDir + "/label"
-        # os.makedirs(labelThreadDir)
-
-        # for model in self.models:
-        #     labelThreadModelDir = labelThreadDir + "/" + model
-        #     os.makedirs(labelThreadModelDir)
-
         """
-        /data
+        /output
             /done
                 /velodyne
                 /labels
-                    /actual
+                /pred
+                    /cyl
+                    /spv
+                    /sal
+                /mutatedPred
                     /cyl
                     /spv
                     /sal
@@ -347,8 +311,6 @@ class SessionManager:
         if os.path.exists(self.doneDir):
             shutil.rmtree(self.doneDir, ignore_errors=True)
             print("Removing {}".format(self.doneDir))
-        # isExist = os.path.exists(doneDir)
-        # if not isExist:
         os.makedirs(self.doneDir)
         
         # done
@@ -363,18 +325,36 @@ class SessionManager:
         if not isExist:
             os.makedirs(self.doneLabelDir)
 
-        # labels done
-        self.doneLabelActualDir = self.doneLabelDir + "/actual"
-        isExist = os.path.exists(self.doneLabelActualDir)
+        # Prediction labels done
+        self.donePredDir = self.doneDir + "/pred"
+        isExist = os.path.exists(self.donePredDir)
         if not isExist:
-            os.makedirs(self.doneLabelActualDir)
+            os.makedirs(self.donePredDir)
         
         for model in self.models:
             # Models done
-            doneLabelModelDir = self.doneLabelDir + "/" + model
-            isExist = os.path.exists(doneLabelModelDir)
+            donePredModelDir = self.donePredDir + "/" + model
+            isExist = os.path.exists(donePredModelDir)
             if not isExist:
-                os.makedirs(doneLabelModelDir)
+                os.makedirs(donePredModelDir)
+
+        # Mutated Prediction labels done
+        self.doneMutatedPredDir = self.doneDir + "/mutatedPred"
+        isExist = os.path.exists(self.doneMutatedPredDir)
+        if not isExist:
+            os.makedirs(self.doneMutatedPredDir)
+        
+        for model in self.models:
+            # Models done
+            doneMutatedPredModelDir = self.doneMutatedPredDir + "/" + model
+            isExist = os.path.exists(doneMutatedPredModelDir)
+            if not isExist:
+                os.makedirs(doneMutatedPredModelDir)
+
+
+
+
+
 
 
 

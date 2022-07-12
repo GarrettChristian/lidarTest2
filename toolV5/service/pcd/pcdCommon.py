@@ -44,7 +44,7 @@ def removeAssetScene(pcdArrAsset, pcdArr, intensity, semantics, instances):
     semanticsRemoved = semantics[mask]
     instancesRemoved = instances[mask]
 
-    return pcdArrRemoved, intensityRemoved, semanticsRemoved, instancesRemoved
+    return pcdArrRemoved, intensityRemoved, semanticsRemoved, instancesRemoved, mask
 
 
 """

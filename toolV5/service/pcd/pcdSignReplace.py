@@ -7,6 +7,7 @@ import random
 import sys
 
 import service.pcd.pcdCommon as pcdCommon
+from domain.modelConstants import models
 
 
 # --------------------------------------------------------------------------
@@ -47,7 +48,14 @@ class Signs(Enum):
 
 def signReplace(signAsset, intensityAsset, semanticsAsset, instancesAsset, 
                 scene, intensity, semantics, instances, 
-                details, signType):
+                details, signType,
+                modelPredictionsScene, modelPredictionsAsset):
+
+    # Add pole to scene model predictions
+    for model in models:
+        modelPole = modelPredictionsAsset[model][semanticsAsset == 80]
+        modelPredictionsScene[model] = np.hstack((modelPredictionsScene[model], modelPole))
+        modelPredictionsAsset[model] = modelPredictionsAsset[model][semanticsAsset == 81]
 
     # Seperate the two portions of a tagged sign
     pole = signAsset[semanticsAsset == 80]
@@ -63,7 +71,7 @@ def signReplace(signAsset, intensityAsset, semanticsAsset, instancesAsset,
     if (np.shape(pole)[0] < 5 or np.shape(sign)[0] < 5):
         # print("Sign {} pole {}, too little points".format(np.shape(sign)[0], np.shape(pole)[0]))
         details["issue"] = "Sign {} pole {}, too little points".format(np.shape(sign)[0], np.shape(pole)[0])
-        return False, None, None, None, None, None, None, None, None, details
+        return False, (None, None, None, None), (None, None, None, None), details, None, None
     
     # Get the bounding box for both the sign and pole
     pcdSign = o3d.geometry.PointCloud()
@@ -105,14 +113,14 @@ def signReplace(signAsset, intensityAsset, semanticsAsset, instancesAsset,
     if (minZSign < -1):
         # print("Sign too low min {}".format(minZSign))
         details["issue"] = "Sign too low min {}".format(minZSign)
-        return False, None, None, None, None, None, None, None, None, details
+        return False, (None, None, None, None), (None, None, None, None), details, None, None
 
     # Validate that the og sign and new sign are roughly the same size
     meshLen = np.linalg.norm(meshMin - meshMin)
     if (np.absolute(meshLen - signLen) > 2):
         # print("Distance to sign too great: mesh len {}, sign len {}".format(meshLen, signLen))
         details["issue"] = "Distance to sign too great: mesh len {}, sign len {}".format(meshLen, signLen)
-        return False, None, None, None, None, None, None, None, None, details
+        return False, (None, None, None, None), (None, None, None, None), details, None, None
 
 
     # Move the mesh to new location based on: pole center, original sign min, and height of the new sign
@@ -145,22 +153,18 @@ def signReplace(signAsset, intensityAsset, semanticsAsset, instancesAsset,
     # Pull the points in the scene to the new sign mesh
     assetData = (sign, intensitySign, semanticsSign, instancesSign)
     sceneData = (scene, intensity, semantics, instances)
-    success, newAssetData, newSceneData, details = pointsToMesh(signMesh, assetData, sceneData, details)
+    success, newAssetData, newSceneData, details, modelPredictionsScene, modelPredictionsAsset = pointsToMesh(signMesh, assetData, sceneData, details, modelPredictionsScene, modelPredictionsAsset)
 
-    sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, instancesNonIntersect = newSceneData
-    sign, intensitySign, semanticsSign, instancesSign = newAssetData
+    # sign, intensitySign, semanticsSign, instancesSign = newAssetData
 
     # Validate that the sign has points
-    if (success and np.shape(sign)[0] < 15):
+    if (success and np.shape(newAssetData[0])[0] < 15):
         # print("Sign too little points")
         details["issue"] = "Sign too little points {}".format(np.shape(sign)[0])
         success = False
 
-    details["pointsRemoved"] = pointsRemoved
-    details["pointsAdded"] = int(np.shape(pcdArrAssetNew)[0])
-    details["pointsAffected"] = int(np.shape(pcdArrAssetNew)[0]) + pointsRemoved
 
-    return success, sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, instancesNonIntersect, sign, intensitySign, semanticsSign, instancesSign, details
+    return success, newSceneData, newAssetData, details, modelPredictionsScene, modelPredictionsAsset
 
 
 
@@ -252,7 +256,7 @@ def getSignMesh(details, signType):
 
 
 
-def pointsToMesh(mesh, assetData, sceneData, details):
+def pointsToMesh(mesh, assetData, sceneData, details, modelPredictionsScene, modelPredictionsAsset):
 
     asset, intensityAsset, semanticsAsset, instancesAsset = assetData
     scene, intensity, semantics, instances = sceneData
@@ -266,7 +270,7 @@ def pointsToMesh(mesh, assetData, sceneData, details):
     if (np.shape(scene)[0] < 1 or np.shape(asset)[0] < 1):
         # print("SCENE or ASSET PROVIDED EMPTY: SCENE {}, ASSET {}".format(np.shape(scene)[0], np.shape(asset)[0]))
         details["issue"] = "SCENE or ASSET PROVIDED EMPTY: SCENE {}, ASSET {}".format(np.shape(scene)[0], np.shape(asset)[0])
-        return False, (None, None, None, None), (None, None, None, None), details
+        return False, (None, None, None, None), (None, None, None, None), details, None, None
 
     raysVectorsScene = []
     for point in scene:
@@ -298,17 +302,17 @@ def pointsToMesh(mesh, assetData, sceneData, details):
 
     rays = o3d.core.Tensor(raysVectorsMesh, dtype=o3d.core.Dtype.Float32)
     ans = sceneRays.cast_rays(rays)
-    hit = ans['t_hit'].isfinite()
-    pointsOnMesh = rays[hit][:,:3] + rays[hit][:,3:]*ans['t_hit'][hit].reshape((-1,1))
+    hitAsset = ans['t_hit'].isfinite()
+    pointsOnMesh = rays[hitAsset][:,:3] + rays[hitAsset][:,3:]*ans['t_hit'][hitAsset].reshape((-1,1))
 
     newAsset = []
     for vector in pointsOnMesh:
         newAsset.append(vector.numpy())
     
-    intensityAsset = intensityAsset[hit.numpy()] 
-    semanticsAsset = semanticsAsset[hit.numpy()]
-    instancesAsset = instancesAsset[hit.numpy()]
-    nonHitAsset = np.logical_not(hit.numpy())
+    intensityAsset = intensityAsset[hitAsset.numpy()] 
+    semanticsAsset = semanticsAsset[hitAsset.numpy()]
+    instancesAsset = instancesAsset[hitAsset.numpy()]
+    nonHitAsset = np.logical_not(hitAsset.numpy())
 
     # print(len(newAsset))
     # print(len(newAssetScene))
@@ -316,7 +320,16 @@ def pointsToMesh(mesh, assetData, sceneData, details):
     if len(newAsset) == 0 or len(newAssetScene) == 0:
         # print("GOT NONE OF THE OG ASSET {} OR NONE OF SCENE {}".format(len(newAsset), len(newAssetScene)))
         details["issue"] = "GOT NONE OF THE ORIGINAL ASSET {} OR NONE OF SCENE {}".format(len(newAsset), len(newAssetScene))
-        return False, (None, None, None, None), (None, None, None, None), details
+        return False, (None, None, None, None), (None, None, None, None), details, None, None
+
+
+    # Update the model prediction semantics as we go
+    modelsSemIntersect = {}
+    for model in models:
+        # Add pole to scene 
+        modelPredictionsAsset[model]
+        modelsSemIntersect[model] = modelPredictionsScene[model][hit.numpy()]
+
 
     # Fix the intensity of each of the points in the scene that were pulled into the sign by using the closest sign point
     pcdAssetNearest = o3d.geometry.PointCloud()
@@ -328,10 +341,25 @@ def pointsToMesh(mesh, assetData, sceneData, details):
         semanticsIntersect[pointIndex] = semanticsAsset[idx]
         instancesIntersect[pointIndex] = instancesAsset[idx]
 
+        # Update model pred
+        for model in models:
+            modelsSemIntersect[model][pointIndex] = modelPredictionsAsset[model][idx]
+
     # Combine the original points of the asset and the new scene points
     newAsset, intensityAsset, semanticsAsset, instancesAsset = pcdCommon.combine(newAsset, intensityAsset, semanticsAsset, instancesAsset, 
                                                                     newAssetScene, intensityIntersect, semanticsIntersect, instancesIntersect)
 
+
+    # Update model pred semantics
+    for model in models:
+        # Update Asset
+        newSemanticsAssetModel = modelPredictionsAsset[model][hitAsset.numpy()]
+        modelPredictionsAsset[model] = np.hstack((newSemanticsAssetModel, modelsSemIntersect[model]))
+        # Update Scene
+        modelPredictionsScene[model] = modelPredictionsScene[model][nonHit]
+
+
+    # Update point metrics
     details["pointsRemoved"] = int(np.sum(nonHitAsset))
     details["pointsMoved"] = int(np.shape(newAsset)[0])
     details["pointsAffected"] = int(np.shape(newAsset)[0]) + int(np.sum(nonHitAsset))
@@ -339,7 +367,7 @@ def pointsToMesh(mesh, assetData, sceneData, details):
     # Return revised scene
     newAssetData = (newAsset, intensityAsset, semanticsAsset, instancesAsset)
     newSceneData = (sceneNonIntersect, intensityNonIntersect, semanticsNonIntersect, instancesNonIntersect)
-    return True, newAssetData, newSceneData, details
+    return True, newAssetData, newSceneData, details, modelPredictionsScene, modelPredictionsAsset
 
 
 

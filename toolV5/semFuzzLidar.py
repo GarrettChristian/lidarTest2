@@ -33,12 +33,17 @@ def parse_args():
         nargs='?', const="/home/garrett/Documents/data/dataset2/sequences/", 
         default="/home/garrett/Documents/data/dataset2/sequences/")
 
+    p.add_argument("-predPath", 
+        help="Path to the prediction label files created by the models, should corrispond with velodyne", 
+        nargs='?', const="/home/garrett/Documents/data/resultsBase/", 
+        default="/home/garrett/Documents/data/resultsBase/")
+
     p.add_argument('-m', 
         help='Transformations to perform comma seperated example: ADD_ROTATE,ADD_MIRROR_ROTATE or ADD_ROTATE defaults to ADD_ROTATE')
 
     p.add_argument("-b", 
         help="Batch to create before evaluating", 
-        nargs='?', const=100, default=100)
+        nargs='?', const=400, default=400)
 
     p.add_argument("-count", 
         help="The total number of valid mutations you would like to create", 
@@ -51,7 +56,7 @@ def parse_args():
 
     # Tool configurable params
     p.add_argument("-saveAt", 
-        help="Location to save the tool output", 
+        help="Location to save the tool output example: /media/garrett/ExtraDrive1", 
         nargs='?', const=os.getcwd(), 
         default=os.getcwd())
 
@@ -80,6 +85,14 @@ def parse_args():
 
     p.add_argument('-ns', help='Disables Saving',
         action='store_false', default=True)
+
+    p.add_argument('-saveAll', help='Disables Deletion',
+        action='store_true', default=False)
+
+    p.add_argument('-removeAll', help='REMOVE will try all assets instead of selecting randomly',
+        action='store_true', default=False)
+
+        
 
     # Debug options
     # Asset / scene
@@ -163,14 +176,14 @@ def main():
     sessionManager = SessionManager(args)
 
     # Start the mutation tool
-    print("Starting Mutation")
-    try:
-        mutationRunner.runMutations(sessionManager)
+    # print("Starting Mutation")
+    # try:
+    mutationRunner.runMutations(sessionManager)
 
-    except KeyboardInterrupt:
-        print("\n--------------------------------------------------------")
-        print("Ctrl+C pressed...")
-        print("Concluding\n")
+    # except KeyboardInterrupt:
+    #     print("\n--------------------------------------------------------")
+    #     print("Ctrl+C pressed...")
+    #     print("Concluding\n")
 
 
    

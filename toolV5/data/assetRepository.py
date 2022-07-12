@@ -6,7 +6,8 @@ Handles all database interaction for assets
 @Date 6/23/22
 """
 
-from pymongo import MongoClient
+
+import pymongo
 import numpy as np
 
 import data.fileIoUtil as fileIoUtil
@@ -171,6 +172,25 @@ class AssetRepository(mongoRepository.MongoRepository):
         labelInstance = labelInstance[maskOnlyInst]
 
         return pcdArr, intensity, semantics, labelInstance, assetRecord
+
+
+
+
+
+    """
+    Page Request for asset record
+    Sorted by _id
+    """
+    def getAssetsPaged(self, page, pageLimit):
+        return self.assetCollection.find({}).sort([("_id", pymongo.ASCENDING)]).skip((page - 1) * pageLimit).limit(pageLimit)
+
+
+
+
+
+
+
+
 
 
 

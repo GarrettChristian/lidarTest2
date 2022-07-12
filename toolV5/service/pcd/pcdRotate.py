@@ -4,6 +4,7 @@ import open3d as o3d
 import random
 
 import service.pcd.pcdCommon as pcdCommon
+from domain.modelConstants import models
 
 # --------------------------------------------------------------------------
 
@@ -39,7 +40,7 @@ def mirrorAsset(pcdArrAsset, details, mirrorAxis):
 # Rotation
 
 
-def rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, details, rotation):
+def rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, details, rotation, modelPredictionsScene):
     attempts = 0
     success = False
     degrees = []
@@ -132,7 +133,7 @@ def rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, details, ro
                     details["issue"] = ""
                     pcdArrAsset = pcdArrAssetNew
                     # print("Removing shadow")
-                    pcdArr, intensity, semantics, labelInstance, pointsRemoved = removeLidarShadow(pcdArrAssetNew, pcdArr, intensity, semantics, labelInstance)
+                    pcdArr, intensity, semantics, labelInstance, pointsRemoved, modelPredictionsScene = removeLidarShadow(pcdArrAssetNew, pcdArr, intensity, semantics, labelInstance, modelPredictionsScene)
                     details["pointsRemoved"] = pointsRemoved
                     details["pointsAdded"] = int(np.shape(pcdArrAssetNew)[0])
                     details["pointsAffected"] = int(np.shape(pcdArrAssetNew)[0]) + pointsRemoved
@@ -140,7 +141,7 @@ def rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, details, ro
 
         attempts += 1
     
-    return success, pcdArrAsset, pcdArr, intensity, semantics, labelInstance, details
+    return success, pcdArrAsset, (pcdArr, intensity, semantics, labelInstance), details, modelPredictionsScene
 
 # --------------------------------------------------------------------------
 # Cuts the points within the lidarShadow
@@ -149,7 +150,7 @@ def rotate(pcdArr, intensity, semantics, labelInstance, pcdArrAsset, details, ro
 Removes the LiDAR shadow by casting lines based on the hull of the asset
 Then deleteing if the points are found within the polygon
 """
-def removeLidarShadow(asset, scene, intensity, semantics, instances):
+def removeLidarShadow(asset, scene, intensity, semantics, instances, modelPredictionsScene):
 
     lidarShadowMesh = pcdCommon.getLidarShadowMesh(asset)
 
@@ -162,7 +163,11 @@ def removeLidarShadow(asset, scene, intensity, semantics, instances):
     semanticsResult = semantics[mask]
     instancesResult = instances[mask]
 
-    return (sceneResult, intensityResult, semanticsResult, instancesResult, pointsIncluded)
+    # Update model prediction files
+    for model in models:
+        modelPredictionsScene[model] = modelPredictionsScene[model][mask]
+
+    return sceneResult, intensityResult, semanticsResult, instancesResult, pointsIncluded, modelPredictionsScene
 
 # --------------------------------------------------------------------------
 # Pre Check for valid placement
