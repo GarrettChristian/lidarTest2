@@ -15,6 +15,7 @@ from PIL import ImageDraw
 
 from data.mutationDetailsRepository import DetailsRepository
 
+from domain.modelConstants import models
 from domain.semanticMapping import color_map_alt_bgr
 
 # --------------------------------------------------------------------------------
@@ -26,7 +27,6 @@ finalVisDir = ""
 
 dedup = set()
 mutations = set()
-models = ["cyl", "spv", "sal"]
 
 scan = None
 vis = None

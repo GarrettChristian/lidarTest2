@@ -9,7 +9,7 @@
 # Directory that contains
 toolData="/home/garrett/Documents/lidarTest2/toolV5/output/"
 # or Mongodb id
-batchId="U5Dk7BfhzzuzF6G2WQKSPF"
+batchId="QeEYxCFcfhqtwgfnapFDXM"
 
 mongoconnect="/home/garrett/Documents/lidarTest2/mongoconnect.txt"
 saveAt="/home/garrett/Documents/lidarTest2/toolV5/output"

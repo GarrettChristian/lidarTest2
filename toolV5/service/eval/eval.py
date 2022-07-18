@@ -16,8 +16,7 @@ import time
 import subprocess
 
 import service.eval.ioueval as ioueval
-
-from domain.modelConstants import models
+import service.eval.modelRunner as modelRunner
 
 import data.baseAccuracyRepository as baseAccuracyRepository
 import data.fileIoUtil as fileIoUtil
@@ -27,21 +26,7 @@ from domain.semanticMapping import learning_map_inv
 from domain.semanticMapping import learning_map
 from domain.semanticMapping import learning_ignore
 from domain.semanticMapping import name_label_mapping
-
-# --------------------------------------------------------------------------
-# Constants
-
-
-pathToModels = "/home/garrett/Documents"
-
-modelCylinder3D = "Cylinder3D"
-modelSpvnas = "spvnas"
-modelSalsaNext = "SalsaNext"
-
-modelCyl = "cyl"
-modelSpv = "spv"
-modelSal = "sal"
-
+from domain.modelConstants import models
 
  
 # --------------------------------------------------------------------------
@@ -64,76 +49,6 @@ for cl, ign in learning_ignore.items():
         ignore.append(x_cl)
 
 evaluator = ioueval.iouEval(numClasses, ignore)
-
-# --------------------------------------------------------------------------
-# Runners
-
-"""
-Runner for the Cylinder3D model
-"""
-def runCyl(sessionManager):
-    print("running {}".format(modelCylinder3D))
-
-    runCommand = "python demo_folder.py "
-    runCommand += "--demo-folder " + sessionManager.dataRoot + "/sequences/00/velodyne " 
-    runCommand += "--save-folder " + sessionManager.resultCylDir
-
-    # Change To Model Dir
-    os.chdir(pathToModels + "/" + modelCylinder3D)
-
-    # runCommand += "2> /dev/null"
-    print(pathToModels + "/" + modelCylinder3D)
-
-    # Run Model
-    # os.system(runCommand)
-    subprocess.Popen(runCommand, shell=True).wait()
-
-
-"""
-Runner for the SPVNAS model
-"""
-def runSpv(sessionManager):
-    print("running {}".format(modelSpvnas))
-
-    runCommand = "torchpack dist-run " 
-    runCommand += "-np 1 python evaluate.py configs/semantic_kitti/default.yaml "
-    runCommand += "--name SemanticKITTI_val_SPVNAS@65GMACs "
-    runCommand += "--data-dir " + sessionManager.dataRoot + "/sequences "
-    runCommand += "--save-dir " + sessionManager.resultSpvDir
-
-    # Change To Model Dir
-    os.chdir(pathToModels + "/" + modelSpvnas)
-
-    # runCommand += "2> /dev/null"
-
-    # Run Model
-    # os.system(runCommand)
-    subprocess.Popen(runCommand, shell=True).wait()
-
-
-"""
-Runner for the SalsaNext model
-"""
-def runSal(sessionManager):
-    print("running {}".format(modelSalsaNext))
-
-    runCommand = "python infer.py " 
-    # Data to run on
-    runCommand += "-d " + sessionManager.dataRoot
-    # Results
-    runCommand += " -l " + sessionManager.resultDir + "/" + modelSal
-    # model
-    runCommand += " -m /home/garrett/Documents/SalsaNext/pretrained "
-    runCommand += "-s test -c 1"
-    
-    # Change To Model Dir
-    os.chdir(pathToModels + "/" + modelSalsaNext + "/train/tasks/semantic")
-
-    # runCommand += "2> /dev/null"
-
-    # Run Model
-    # os.system(runCommand)
-    subprocess.Popen(runCommand, shell=True).wait()
 
 
 # --------------------------------------------------------------------------
@@ -416,9 +331,11 @@ def evalBatch(details, sessionManager,  complete, total):
 
     # run all models on bin files
     print("Run models")
-    runCyl(sessionManager)
-    runSpv(sessionManager)
-    runSal(sessionManager)
+    modelRunner.runCyl(sessionManager)
+    modelRunner.runSpv(sessionManager)
+    modelRunner.runSal(sessionManager)
+    modelRunner.runSq3(sessionManager.dataRoot, sessionManager.resultDir + "/" + "sq3")
+    modelRunner.runDar(sessionManager.dataRoot, sessionManager.resultDir + "/" + "dar")
 
 
     # Move bins to done from the current folder
@@ -453,6 +370,8 @@ def evalBatch(details, sessionManager,  complete, total):
     predFilesCyl = glob.glob(sessionManager.resultCylDir + "/*.label")
     predFilesSpv = glob.glob(sessionManager.resultSpvDir + "/*.label")
     predFilesSal = glob.glob(sessionManager.resultSalDir + "/predictions/*.label")
+    predFilesSq3 = glob.glob(sessionManager.resultSq3Dir + "/predictions/*.label")
+    predFilesDar = glob.glob(sessionManager.resultDarDir + "/predictions/*.label")
 
 
     # Sort the labels, modified predictions, and new predictions
@@ -461,10 +380,25 @@ def evalBatch(details, sessionManager,  complete, total):
     predFiles["cyl"] = sorted(predFilesCyl)    
     predFiles["spv"] = sorted(predFilesSpv)
     predFiles["sal"] = sorted(predFilesSal)
+    predFiles["sq3"] = sorted(predFilesSq3)
+    predFiles["dar"] = sorted(predFilesDar)
     for model in models:
         modifiedPred[model] = sorted(modifiedPred[model])
     details = sorted(details, key=itemgetter('_id')) 
 
+    # Assert that we have predictions and labels
+    totalFiles = len(labelFiles)
+    for model in models:
+        totalFiles += len(predFiles[model])
+    if (totalFiles / (1 + len(models)) != len(details)):
+        raise ValueError("ERROR: preds do not match labels, cyl {}, spv {}, sal {}, sq3 {}, dar {}, labels {}, details {}".format(
+                                                                                                                        len(predFiles["cyl"]), 
+                                                                                                                        len(predFiles["spv"]), 
+                                                                                                                        len(predFiles["sal"]), 
+                                                                                                                        len(predFiles["sq3"]), 
+                                                                                                                        len(predFiles["dar"]), 
+                                                                                                                        len(labelFiles), 
+                                                                                                                        len(details)))
 
     # Evaluate the labels, modified predictions, and new predictions
     for index in range(0, len(labelFiles)):

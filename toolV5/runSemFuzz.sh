@@ -9,8 +9,8 @@
 # mut="ADD_ROTATE"
 # mut="ADD_MIRROR_ROTATE"
 # mut="SCENE_REMOVE"
-# mut="SIGN_REPLACE"
-mut="VEHICLE_DEFORM"
+mut="SIGN_REPLACE"
+# mut="VEHICLE_DEFORM"
 # mut="VEHICLE_INTENSITY"
 # mut="VEHICLE_SCALE"
 
@@ -31,16 +31,17 @@ assetId="00-002452-129-car"
 assetId="00-000450-282-car"
 assetId="00-004159-431-car"
 assetId="01-000050-1389-traffic-sign"
-assetId="01-000050-1389-traffic-sign"
-assetId="02-000065-1837-traffic-sign"
-assetId="00-000014-1-moving-motorcyclist"
-assetId="08-003459-1023-traffic-sign"
+# assetId="01-000050-1389-traffic-sign"
+# assetId="02-000065-1837-traffic-sign"
+# assetId="00-000014-1-moving-motorcyclist"
+# assetId="08-003459-1023-traffic-sign"
+# assetId="00-000003-213-car"
 # assetId="00-000000-1"
 # assetId="00-000156-6"
 # assetId="04-000050-6-moving-car"
 # assetId="08-000368-12-other-vehicle"
 # assetId="06-000882-3-truck"
-count=2
+count=1
 batch=40
 
 
@@ -49,7 +50,7 @@ batch=40
 # Run command 
 
 # python semFuzzLidar.py -path "$velPath" -lbls $lblPath
-python semFuzzLidar.py -binPath "$binPath" -labelPath $lblPath -predPath $predPath -m $mut -count $count -b $batch
+python semFuzzLidar.py -binPath "$binPath" -labelPath $lblPath -predPath $predPath -m $mut -count $count -b $batch -ns -assetId $assetId -vis
 # python semFuzzLidar.py -binPath "$binPath" -labelPath $lblPath -predPath $predPath -m $mut -count $count -b $batch
 # python semFuzzLidar.py -binPath "$binPath" -labelPath $lblPath -predPath $predPath -m $mut -count $count -b $batch -saveAt $saveTo
 # python semFuzzLidar.py -binPath "$binPath" -labelPath $lblPath -m $mut -count $count -b $batch -asyncEval

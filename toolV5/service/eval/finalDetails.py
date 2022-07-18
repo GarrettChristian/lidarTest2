@@ -15,6 +15,7 @@ from domain.mutationsEnum import Mutation
 
 # --------------------------------------------------------------------------
 
+
 accJaccKeyList = ["accuracy", "jaccard"]
 
 
@@ -59,6 +60,7 @@ finalData {}
                     cyl_sal - int
                     spv_sal - int          
                     cyl_spv_sal - int
+                    ... [All model key combos]
         jaccard {}
             ... same as accuracy
     *model {}

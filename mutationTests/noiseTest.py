@@ -142,7 +142,9 @@ def deform(asset, scene, intensity, semantics, labelsInstance):
     pcdAsset.points = o3d.utility.Vector3dVector(asset)
     pcdAsset.paint_uniform_color([0.5, 0.5, 0.5])
 
-    # Select random point
+    o3d.visualization.draw_geometries([pcdAsset])
+
+    # Select random point 1102
     pointIndex = np.random.choice(asset.shape[0], 1, replace=False)
     print(pointIndex)
     pcdAsset.colors[pointIndex] = [1, 0, 0]
@@ -178,7 +180,13 @@ def deform(asset, scene, intensity, semantics, labelsInstance):
     print(idx)
 
     # o3d.visualization.draw_geometries([pcdAsset])
-    o3d.visualization.draw_geometries([pcdAsset, pcd])
+    # o3d.visualization.draw_geometries([pcdAsset], 
+    #                                     zoom=1,
+    #                                     front=[1, 1, 0],
+    #                                     lookat=[0, 0, 0],
+    #                                     up=[0, 0, 0])
+    # o3d.visualization.draw_geometries([pcdAsset, pcd])
+
 
 
 
@@ -187,10 +195,12 @@ def deform(asset, scene, intensity, semantics, labelsInstance):
 Main Method
 """
 def main():
-    labelsFileName = "/home/garrett/Documents/data/dataset/sequences/00/labels/000001.label"
-    binFileName = "/home/garrett/Documents/data/dataset/sequences/00/velodyne/000001.bin"
+    # labelsFileName = "/home/garrett/Documents/data/dataset/sequences/00/labels/000001.label"
+    # binFileName = "/home/garrett/Documents/data/dataset/sequences/00/velodyne/000001.bin"
     # labelsFileName = "/Volumes/Extreme SSD/semKitti/dataset/sequences/00/labels/000001.label"
     # binFileName = "/Volumes/Extreme SSD/semKitti/dataset/sequences/00/velodyne/000001.bin"
+    labelsFileName = "/home/garrett/Documents/data/dataset/sequences/00/labels/000003.label"
+    binFileName = "/home/garrett/Documents/data/dataset/sequences/00/velodyne/000003.bin"
 
     # ------
 
@@ -209,7 +219,8 @@ def main():
 
     # ------
 
-    asset = pcdArr[labelsInstance == 212]
+    # asset = pcdArr[labelsInstance == 212]
+    asset = pcdArr[labelsInstance == 213]
 
     # alignZdim(asset, pcdArr, intensity, semantics, labelsInstance)
 

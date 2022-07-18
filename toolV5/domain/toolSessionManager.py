@@ -22,7 +22,7 @@ class SessionManager:
 
         # Run batch id
         self.batchId = str(shortuuid.uuid())
-        self.models = ["cyl", "spv", "sal"]
+        self.models = ["cyl", "spv", "sal", "sq3", "dar"]
 
         self.mongoConnect = args.mdb
 
@@ -119,6 +119,8 @@ class SessionManager:
             self.resultCylDir = ""
             self.resultSpvDir = ""
             self.resultSalDir = ""
+            self.resultSq3Dir = ""
+            self.resultDarDir = ""
             self.evalDir = ""
             self.dataDir = ""
             self.doneLabelDir = ""
@@ -209,6 +211,8 @@ class SessionManager:
                 /cyl
                 /spv
                 /sal/sequences/00
+                /sq3/sequences/00
+                /dar/sequences/00
             /done
                 /velodyne
                 /labels
@@ -216,10 +220,14 @@ class SessionManager:
                     /cyl
                     /spv
                     /sal
+                    /sq3
+                    /dar
                 /mutatedPred
                     /cyl
                     /spv
                     /sal
+                    /sq3
+                    /dar
         """
 
         # make a top level output dir
@@ -290,6 +298,21 @@ class SessionManager:
             shutil.rmtree(self.resultDir + "/sal", ignore_errors=True)
             print("Removing {}".format(self.resultSalDir))
         os.makedirs(self.resultSalDir, exist_ok=True)
+
+        # Sq3
+        self.resultSq3Dir = self.resultDir + "/sq3/sequences/00"
+        if os.path.exists(self.resultDir + "/sq3"):
+            shutil.rmtree(self.resultDir + "/sq3", ignore_errors=True)
+            print("Removing {}".format(self.resultSq3Dir))
+        os.makedirs(self.resultSq3Dir, exist_ok=True)
+
+        # dar
+        self.resultDarDir = self.resultDir + "/dar/sequences/00"
+        if os.path.exists(self.resultDir + "/dar"):
+            shutil.rmtree(self.resultDir + "/dar", ignore_errors=True)
+            print("Removing {}".format(self.resultDarDir))
+        os.makedirs(self.resultDarDir, exist_ok=True)
+
 
         """
         /output

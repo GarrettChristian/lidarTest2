@@ -172,7 +172,7 @@ def main():
 
     print("Connecting to Mongo")
     mdb = mongoConnect()
-    mdbCol = mdb["base_accuracy2"]
+    mdbCol = mdb["base_accuracy3"]
     print("Connected")
 
 
@@ -185,6 +185,15 @@ def main():
     args = parse_args() 
     labelBasePath = args.labels
     predBasePath = args.pred
+
+
+    items = 0
+    acc = {}
+    iou = {}
+
+    for model in ["cyl", "spv", "sal", "sq3", "pol"]:
+        acc[model] = 0
+        iou[model] = 0
     
     for x in range(0, 11):
 
@@ -192,21 +201,20 @@ def main():
 
         folderNum = str(x).rjust(2, '0')
 
+        # Get pred label / pred path
         labelPath = labelBasePath + folderNum + "/labels/"
-        predPathCyl = predBasePath + folderNum + "/cyl/"
-        predPathSal = predBasePath + folderNum + "/sal/"
-        predPathSpv = predBasePath + folderNum + "/spv/"
+        predPaths = {}
+        for model in ["cyl", "spv", "sal", "sq3", "pol"]:
+            predPaths[model] = predBasePath + folderNum + "/" + model + "/"
 
+        # Get label / pred files sort
         labelFiles = glob.glob(labelPath + "*.label")
-        predFilesCyl = glob.glob(predPathCyl + "*.label")
-        predFilesSal = glob.glob(predPathSal + "*.label")
-        predFilesSpv = glob.glob(predPathSpv + "*.label")
+        labelFiles = sorted(labelFiles)  
+        predFilesModel = {}
+        for model in ["cyl", "spv", "sal", "sq3", "pol"]:
+            predFilesModel[model] = glob.glob(predPaths[model] + "*.label")
+            predFilesModel[model] = sorted(predFilesModel[model])
         
-        # Order the update files cronologically
-        labelFiles = sorted(labelFiles)
-        predFilesCyl = sorted(predFilesCyl)    
-        predFilesSal = sorted(predFilesSal)    
-        predFilesSpv = sorted(predFilesSpv)        
         for index in range(0, len(labelFiles)):
 
             fileName = basename(labelFiles[index])
@@ -217,23 +225,31 @@ def main():
             sceneEval["sequence"] = folderNum
             sceneEval["scene"] = fileName
 
-            cylRes = eval(labelFiles[index], predFilesCyl[index])
-            spvRes = eval(labelFiles[index], predFilesSpv[index])
-            salRes = eval(labelFiles[index], predFilesSal[index])
-
             pointCounts, pointMetrics = getPointMetrics(labelFiles[index])
-
             sceneEval["points"] = pointCounts
             sceneEval["pointMetrics"] = pointMetrics
-            sceneEval["cyl"] = cylRes
-            sceneEval["spv"] = spvRes
-            sceneEval["sal"] = salRes
+
+            for model in ["cyl", "spv", "sal", "sq3", "pol"]:
+                sceneEval[model] = eval(labelFiles[index], predFilesModel[model][index])
+                acc[model] += sceneEval[model]["accuracy"]
+                iou[model] += sceneEval[model]["jaccard"]
+
+            items += 1
+
             add.append(sceneEval)
 
             print(pointCounts)
             print(pointMetrics)
 
         mdbCol.insert_many(add)
+
+
+    print("\n\n\nDONE ACC JAC:\n")
+    for model in ["cyl", "spv", "sal", "sq3", "pol"]:
+        print(model)
+        print(acc[model] / items)
+        print(iou[model] / items)
+        
 
 
 if __name__ == '__main__':

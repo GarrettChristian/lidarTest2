@@ -4,15 +4,15 @@ import argparse
 import json
 import os
 import sys
+from itertools import combinations
 
+from domain.modelConstants import models
 import data.finalDataRepository as finalDataRepository
 import domain.mutationsEnum as mutationsEnum
 
 # --------------------------------------------------------------------------------
 
-models = ["cyl", "spv", "sal"]
-
-modelCombos = ["cyl", "spv", "sal", "cyl_spv", "cyl_sal", "spv_sal", "cyl_spv_sal"]
+modelCombos = []
 
 # --------------------------------------------------------------------------------
 
@@ -261,6 +261,18 @@ def createMutationCsv(mutationDataAcc, mutation, accType, saveAt, bucketKeys, ti
         csvWriter.writerow(row)
 
 
+def getModelComboKeys():
+
+    combos = []
+    for n in range(1, len(models) + 1):
+        combos += list(combinations(models, n))
+
+    comboKeys = []
+    for combo in combos:
+        comboKeys.append("_".join(combo))
+
+    return comboKeys
+
 
 def parse_args():
     p = argparse.ArgumentParser(
@@ -287,6 +299,7 @@ def parse_args():
 # ----------------------------------------------------------
 
 def main():
+    global modelCombos
 
     print("\n\n------------------------------")
     print("\n\nStarting Mutation CSV Generator\n\n")
@@ -295,6 +308,8 @@ def main():
     dataDir = args.data
     dataId = args.id
     data = None
+
+    modelCombos = getModelComboKeys()
 
     # Get the final data json
     # Get from database if id is provided

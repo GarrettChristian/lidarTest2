@@ -5,7 +5,7 @@
 
 
 
-models = ["cyl", "spv", "sal"]
+models = ["cyl", "spv", "sal", "sq3", "dar"]
 
 
 
