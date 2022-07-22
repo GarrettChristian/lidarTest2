@@ -2,6 +2,11 @@
 
 
 # ------------------------------------------
+# Helper depending on where the model saves the results
+
+
+# ------------------------------------------
+
 
 
 # for model in "pol" "sq3"

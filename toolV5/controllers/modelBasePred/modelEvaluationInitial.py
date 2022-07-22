@@ -1,5 +1,5 @@
 """
-modelValsInitial
+modelEvaluationInitial
 Get the original accuracy and jaccard values for the base model predictions
 
 @Author Garrett Christian

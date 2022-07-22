@@ -70,8 +70,6 @@ def runSpv(sessionManager):
     # Change To Model Dir
     os.chdir(pathToModels + "/" + modelSpvnas)
 
-    # runCommand += "2> /dev/null"
-
     # Run Model
     # os.system(runCommand)
     subprocess.Popen(runCommand, shell=True).wait()
@@ -83,19 +81,17 @@ Runner for the SalsaNext model
 def runSal(sessionManager):
     print("running {}".format(modelSalsaNext))
 
-    runCommand = "python infer.py " 
+    runCommand = "python infer.py" 
     # Data to run on
-    runCommand += "-d " + sessionManager.dataRoot
+    runCommand += " -d " + sessionManager.dataRoot
     # Results
     runCommand += " -l " + sessionManager.resultDir + "/" + modelSal
     # model
-    runCommand += " -m /home/garrett/Documents/SalsaNext/pretrained "
-    runCommand += "-s test -c 1"
+    runCommand += " -m /home/garrett/Documents/SalsaNext/pretrained"
+    runCommand += " -s test -c 1"
     
     # Change To Model Dir
     os.chdir(pathToModels + "/" + modelSalsaNext + "/train/tasks/semantic")
-
-    # runCommand += "2> /dev/null"
 
     # Run Model
     # os.system(runCommand)

@@ -11,7 +11,7 @@ predBasePath="/home/garrett/Documents/data/resultsBase/"
 # ------------------------------------------
 
 
-python modelValsInitial.py -labels $labelBasePath -pred $predBasePath
+python modelEvaluationInitial.py -labels $labelBasePath -pred $predBasePath
 
 
 # ------------------------------------------

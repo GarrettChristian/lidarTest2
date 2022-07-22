@@ -28,8 +28,12 @@
 # vel="/home/garrett/Documents/lidarTest2/toolV5/finalVisualize/finalvis/SIGN_REPLACE/data/done/velodyne"
 # scan=/home/garrett/Documents/lidarTest2/toolV5/data/done/labels/actual/jK42Fj2adSqwkfg4U6ZtBi-SCENE_REMOVE.label
 # vel=/home/garrett/Documents/lidarTest2/toolV5/data/done/velodyne
-scan=/home/garrett/Documents/lidarTest2/toolV5/data/done/labels/actual/L5VUgaVwkG7U2moAuVhiAF-ADD_ROTATE.label
-vel=/home/garrett/Documents/lidarTest2/toolV5/data/done/velodyne
+# scan=/home/garrett/Documents/lidarTest2/toolV5/data/done/labels/actual/L5VUgaVwkG7U2moAuVhiAF-ADD_ROTATE.label
+# vel=/home/garrett/Documents/lidarTest2/toolV5/data/done/velodyne
+scan=/home/garrett/Documents/data/out/sequences/00/predictions/000000.label
+# scan=/home/garrett/Documents/data/out/000000.label
+vel="/home/garrett/Documents/data/dataset/sequences/00/velodyne"
+# scan=/home/garrett/Documents/data/resultsBase/00/pol/000000.label
 
 
 ./visualizeCustom.py -ps $scan -v $vel

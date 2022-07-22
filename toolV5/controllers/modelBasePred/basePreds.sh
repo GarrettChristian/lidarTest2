@@ -9,7 +9,7 @@ stage="/home/garrett/Documents/data/tmp/dataset/sequences/00/velodyne/"
 pred="/home/garrett/Documents/data/resultsBase/"
 # model="sq3"
 # model="pol"
-model=dar
+# model=dar
 
 # ------------------------------------------
 

@@ -6,30 +6,44 @@ and transformation
 
 from enum import Enum
 
-# Where / what the asset utilized will be
+
+# ----------------------------------------------------------
+# Where the asset will come from 
+# (ADD, any scene or SCENE the specific scene)
+# What type of asset will be utilized 
+# Currenly have SIGN and VEHICLE type specific mutations
+
+
 class AssetLocation(Enum):
     ADD = "ADD"
     SCENE = "SCENE"
-    SIGN = "SIGN"
-    VEHICLE = "VEHICLE"
+    SIGN = "SIGN" # subset of scene
+    VEHICLE = "VEHICLE" # subset of scene
 
 
+# ----------------------------------------------------------
 # What transformations will be performed on that asset
+# Three main classifications of transformations
+# ADD, REMOVE, and CHANGE
+
+
 class Transformation(Enum):
-    # Add
-    ROTATE = "ROTATE"
-    MIRROR = "MIRROR"
-    # Scene
-    REMOVE = "REMOVE"
-    # Sign
-    REPLACE = "REPLACE"
-    # Vehicle
-    INTENSITY = "INTENSITY"
-    DEFORM = "DEFORM"
-    SCALE = "SCALE"
+    # ADD
+    ROTATE = "ROTATE" # ADD
+    MIRROR = "MIRROR"  # ADD
+    # REMOVE
+    REMOVE = "REMOVE" # SCENE
+    # CHANGE
+    REPLACE = "REPLACE" # SIGN
+    INTENSITY = "INTENSITY" # Vehicle
+    DEFORM = "DEFORM" # Vehicle
+    SCALE = "SCALE" # Vehicle
 
 
+# ----------------------------------------------------------
 # Enum of the different types of mutations supported
+
+
 class Mutation(Enum):
     ADD_ROTATE = AssetLocation.ADD.name + "_" + Transformation.ROTATE.name,
     ADD_MIRROR_ROTATE = AssetLocation.ADD.name + "_" + Transformation.MIRROR.name + "_" + Transformation.ROTATE.name,

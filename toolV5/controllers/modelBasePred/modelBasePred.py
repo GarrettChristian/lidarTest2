@@ -12,7 +12,12 @@ import glob, os
 import shutil
 import argparse
 
-import service.eval.modelRunner as modelRunner
+from service.models.cylRunner import CylRunner
+from service.models.spvRunner import SpvRunner
+from service.models.salRunner import SalRunner
+from service.models.sq3Runner import Sq3Runner
+from service.models.polRunner import PolRunner
+from service.models.ranRunner import RanRunner
 
 
 # -------------------------------------------------------------
